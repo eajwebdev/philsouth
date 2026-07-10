@@ -1,5 +1,7 @@
 import * as React from 'react';
+import { toast } from 'sonner';
 import { Plus, Trash2, PackageSearch } from 'lucide-react';
+import { ScanField } from '@/components/scan-field';
 import {
     Popover,
     PopoverContent,
@@ -48,6 +50,7 @@ interface FlatOption {
     variantLabel: string | null;
     sku: string;
     uom: string;
+    barcode: string | null;
     hasVariants: boolean;
 }
 
@@ -60,6 +63,7 @@ function flatten(items: CatalogItem[]): FlatOption[] {
             variantLabel: item.has_variants ? v.label ?? v.sku : null,
             sku: v.sku,
             uom: v.uom || item.uom,
+            barcode: v.barcode,
             hasVariants: item.has_variants,
         })),
     );
@@ -88,6 +92,20 @@ export function LineItemsEditor({
         if (chosenIds.has(id)) return;
         onChange([...value, { item_variant_id: id, quantity: '', ...(withUnit ? { unit: '' } : {}) }]);
         setPickerOpen(false);
+    };
+
+    const onScan = (code: string) => {
+        const match = options.find((o) => o.barcode && o.barcode === code);
+        if (!match) {
+            toast.error('Item not found', { description: `No active variant has barcode ${code}.` });
+            return;
+        }
+        if (chosenIds.has(match.id)) {
+            toast.info('Already added', { description: match.itemDescription });
+            return;
+        }
+        addVariant(match.id);
+        toast.success('Item added', { description: `${match.itemDescription} (${match.sku})` });
     };
 
     const updateLine = (index: number, patch: Partial<LineItem>) => {
@@ -138,10 +156,12 @@ export function LineItemsEditor({
                 </Popover>
             </div>
 
+            <ScanField onScan={onScan} placeholder="Scan a barcode to add a line…" />
+
             {value.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-center">
                     <PackageSearch className="size-8 text-muted-foreground/50" />
-                    <p className="text-sm text-muted-foreground">No items added yet.</p>
+                    <p className="text-sm text-muted-foreground">No items added yet. Scan or use “Add item”.</p>
                 </div>
             ) : (
                 <div className="rounded-xl border">

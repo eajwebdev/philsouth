@@ -82,6 +82,13 @@ class DemoSeeder extends Seeder
             ->concat($barVariants)
             ->filter();
 
+        // Give each variant a scannable barcode (demo).
+        foreach ($variants as $variant) {
+            if (! $variant->barcode) {
+                $variant->update(['barcode' => 'PS-'.$variant->sku]);
+            }
+        }
+
         // Opening balances posted through the ledger so reports reconcile.
         $stockService = app(StockService::class);
         foreach ([$makati, $qc, $cebu] as $site) {

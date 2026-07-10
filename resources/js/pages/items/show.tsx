@@ -9,6 +9,7 @@ import {
     Star,
     Barcode,
     Layers,
+    QrCode,
     X,
 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
@@ -83,13 +84,18 @@ export default function ItemShow({ item, can }: Props) {
                         description={`${item.code} · ${item.uom}${item.category ? ' · ' + item.category : ''}`}
                         icon={Package}
                         actions={
-                            item.has_variants ? (
-                                <Badge variant="secondary" className="gap-1">
-                                    <Layers className="size-3" /> Variant item
-                                </Badge>
-                            ) : (
-                                <Badge variant="outline">Single stockable unit</Badge>
-                            )
+                            <div className="flex items-center gap-2">
+                                {item.has_variants ? (
+                                    <Badge variant="secondary" className="gap-1">
+                                        <Layers className="size-3" /> Variant item
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline">Single stockable unit</Badge>
+                                )}
+                                <Button variant="outline" asChild>
+                                    <Link href={route('items.labels', item.id)}><QrCode /> QR labels</Link>
+                                </Button>
+                            </div>
                         }
                     />
                 </div>

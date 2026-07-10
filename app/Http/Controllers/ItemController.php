@@ -49,6 +49,24 @@ class ItemController extends Controller
         ]);
     }
 
+    public function labels(Request $request, Item $item): Response
+    {
+        $this->authorize('view', $item);
+
+        $item->load(['variants' => fn ($q) => $q->where('is_active', true)->orderByDesc('is_default')->orderBy('sku')]);
+
+        return Inertia::render('items/labels', [
+            'item' => $item->only('id', 'code', 'description', 'uom'),
+            'variants' => $item->variants->map(fn ($v) => [
+                'id' => $v->id,
+                'sku' => $v->sku,
+                'label' => $v->label,
+                'barcode' => $v->barcode,
+                'payload' => $v->barcode ?: $v->sku,
+            ]),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Item::class);

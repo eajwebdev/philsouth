@@ -29,6 +29,7 @@ class PagesRenderTest extends TestCase
             ['dashboard', 'dashboard'],
             ['items.index', 'items/index'],
             ['inventory.index', 'inventory/index'],
+            ['inventory.count', 'inventory/count'],
             ['receiving.index', 'receiving/index'],
             ['withdrawals.index', 'withdrawals/index'],
             ['withdrawals.create', 'withdrawals/create'],
@@ -48,6 +49,9 @@ class PagesRenderTest extends TestCase
         // Item detail + receiving create (bound / role-specific routes).
         $this->actingAs($super)->get(route('items.show', $item))
             ->assertOk()->assertInertia(fn ($p) => $p->component('items/show'));
+
+        $this->actingAs($super)->get(route('items.labels', $item))
+            ->assertOk()->assertInertia(fn ($p) => $p->component('items/labels'));
     }
 
     public function test_ics_can_open_receiving_create(): void

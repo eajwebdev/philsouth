@@ -5,7 +5,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryReceiptController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\PhysicalCountController;
 use App\Http\Controllers\Reports\MonthlySummaryController;
+use App\Http\Controllers\ScanController;
 use App\Http\Controllers\Reports\StockCardController;
 use App\Http\Controllers\ItemVariantController;
 use App\Http\Controllers\SiteController;
@@ -46,6 +48,7 @@ Route::middleware('auth')->group(function () {
 
     // Items master
     Route::get('items', [ItemController::class, 'index'])->name('items.index');
+    Route::get('items/{item}/labels', [ItemController::class, 'labels'])->name('items.labels');
     Route::get('items/{item}', [ItemController::class, 'show'])->name('items.show');
     Route::post('items', [ItemController::class, 'store'])->name('items.store');
     Route::put('items/{item}', [ItemController::class, 'update'])->name('items.update');
@@ -59,6 +62,11 @@ Route::middleware('auth')->group(function () {
 
     // Scoped stock views
     Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+
+    // Scanning + physical count
+    Route::get('scan/lookup', [ScanController::class, 'lookup'])->name('scan.lookup');
+    Route::get('inventory/count', [PhysicalCountController::class, 'index'])->name('inventory.count');
+    Route::post('inventory/count', [PhysicalCountController::class, 'store'])->name('inventory.count.store');
 
     // Receiving (delivery receipts)
     Route::get('receiving', [DeliveryReceiptController::class, 'index'])->name('receiving.index');

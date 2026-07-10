@@ -7,6 +7,7 @@ import {
     Truck,
     ClipboardList,
     ArrowLeftRight,
+    FileText,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -77,6 +78,18 @@ export const NAV_SECTIONS: NavSection[] = [
                 icon: ArrowLeftRight,
                 permissions: ['transfer.create', 'transfer.receive', 'inventory.view'],
                 activeMatch: ['transfers.'],
+            },
+        ],
+    },
+    {
+        heading: 'Reports',
+        items: [
+            {
+                label: 'Stock Card',
+                routeName: 'reports.stock-card',
+                icon: FileText,
+                permissions: ['reports.view'],
+                activeMatch: ['reports.stock-card'],
             },
         ],
     },

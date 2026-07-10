@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryReceiptController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\Reports\StockCardController;
 use App\Http\Controllers\ItemVariantController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteTeamController;
@@ -86,6 +87,9 @@ Route::middleware('auth')->group(function () {
     Route::post('transfers/{transfer}/dispatch', [TransferSlipController::class, 'dispatchTransfer'])->name('transfers.dispatch');
     Route::post('transfers/{transfer}/receive', [TransferSlipController::class, 'receive'])->name('transfers.receive');
     Route::post('transfers/{transfer}/cancel', [TransferSlipController::class, 'cancel'])->name('transfers.cancel');
+
+    // Reports
+    Route::get('reports/stock-card', [StockCardController::class, 'index'])->name('reports.stock-card');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

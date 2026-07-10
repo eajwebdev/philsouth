@@ -16,6 +16,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { IconButton } from '@/components/icon-button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ClientPagination, useClientPagination } from '@/components/client-pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +69,7 @@ export default function ItemShow({ item, can }: Props) {
     const [formOpen, setFormOpen] = React.useState(false);
     const [editing, setEditing] = React.useState<Variant | null>(null);
     const [deleting, setDeleting] = React.useState<Variant | null>(null);
+    const pager = useClientPagination(item.variants, 10);
 
     return (
         <>
@@ -133,7 +135,7 @@ export default function ItemShow({ item, can }: Props) {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {item.variants.map((v) => (
+                                    {pager.paged.map((v) => (
                                         <TableRow key={v.id}>
                                             <TableCell className="font-mono text-sm font-medium">
                                                 <span className="flex items-center gap-2">
@@ -207,6 +209,7 @@ export default function ItemShow({ item, can }: Props) {
                                 </TableBody>
                             </Table>
                         </div>
+                        <ClientPagination {...pager} />
                     </CardContent>
                 </Card>
             </div>

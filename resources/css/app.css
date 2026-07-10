@@ -168,6 +168,146 @@
     }
 }
 
+/* ---------------------------------------------------------------------------
+ * Motion — brand animations. Every ambient loop is disabled under
+ * prefers-reduced-motion; entrance animations collapse to a simple fade.
+ * ------------------------------------------------------------------------- */
+@keyframes ps-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes ps-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes ps-float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-14px);
+    }
+}
+
+@keyframes ps-drift {
+    from {
+        background-position: 0 0;
+    }
+    to {
+        background-position: 80px 80px;
+    }
+}
+
+@keyframes ps-sway {
+    0%,
+    100% {
+        transform: rotate(-2.5deg);
+    }
+    50% {
+        transform: rotate(2.5deg);
+    }
+}
+
+@keyframes ps-hook {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(26px);
+    }
+}
+
+@keyframes ps-rise {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+    }
+    12% {
+        opacity: 0.9;
+    }
+    88% {
+        opacity: 0.35;
+    }
+    100% {
+        transform: translateY(-46vh) scale(0.6);
+        opacity: 0;
+    }
+}
+
+@keyframes ps-blink {
+    0%,
+    92%,
+    100% {
+        opacity: 1;
+    }
+    96% {
+        opacity: 0.15;
+    }
+}
+
+.animate-fade-up {
+    animation: ps-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-in {
+    animation: ps-fade-in 0.5s ease-out both;
+}
+
+.animate-float {
+    animation: ps-float 6s ease-in-out infinite;
+}
+
+.page-enter {
+    animation: ps-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.delay-75 { animation-delay: 75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* Interactive cards lift slightly. */
+.card-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -8px color-mix(in oklab, var(--primary) 25%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-float,
+    .login-scene * {
+        animation: none !important;
+    }
+    .animate-fade-up,
+    .animate-fade-in,
+    .page-enter {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+    }
+    .card-lift,
+    .card-lift:hover {
+        transform: none;
+        transition: none;
+    }
+}
+
 /* Print-friendly reports (A4) */
 @media print {
     body {

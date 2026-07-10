@@ -17,6 +17,7 @@ function useFlashToasts() {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     useFlashToasts();
+    const { component } = usePage();
 
     return (
         <TooltipProvider delayDuration={200}>
@@ -25,7 +26,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex min-w-0 flex-1 flex-col">
                     <TopBar />
                     <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-                        <div className="mx-auto w-full max-w-7xl">{children}</div>
+                        {/* keyed by page so the entrance animation replays on navigation */}
+                        <div key={component} className="page-enter mx-auto w-full max-w-7xl">
+                            {children}
+                        </div>
                     </main>
                 </div>
             </div>

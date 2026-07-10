@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import { CalendarRange, Printer, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
+import { ClientPagination, useClientPagination } from '@/components/client-pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,10 +76,21 @@ const COLS: { key: keyof Row; label: string; tone?: 'in' | 'out' }[] = [
 export default function MonthlySummaryReport({ sites, filters, summary }: Props) {
     const [siteId, setSiteId] = React.useState<string>(filters.site_id ? String(filters.site_id) : '');
     const [month, setMonth] = React.useState<string>(filters.month);
+    const [printing, setPrinting] = React.useState(false);
+    const pager = useClientPagination(summary?.rows ?? [], 15, printing);
 
     const generate = () => {
         if (!siteId) return;
         router.get(route('reports.monthly-summary'), { site_id: siteId, month }, { preserveState: true });
+    };
+
+    // Render every row before opening the print dialog.
+    const printReport = () => {
+        setPrinting(true);
+        setTimeout(() => {
+            window.print();
+            setPrinting(false);
+        }, 80);
     };
 
     return (
@@ -90,7 +102,7 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                     description="Movement aggregation per item for a site and month (F-INV-006)."
                     icon={CalendarRange}
                     actions={summary && (
-                        <Button variant="outline" onClick={() => window.print()} className="no-print">
+                        <Button variant="outline" onClick={printReport} className="no-print">
                             <Printer /> Print
                         </Button>
                     )}
@@ -156,7 +168,7 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                                     {summary.rows.length === 0 ? (
                                         <TableRow><TableCell colSpan={COLS.length + 1} className="h-24 text-center text-muted-foreground">No activity for this month.</TableCell></TableRow>
                                     ) : (
-                                        summary.rows.map((r) => (
+                                        pager.paged.map((r) => (
                                             <TableRow key={r.variant.id}>
                                                 <TableCell className="sticky left-0 bg-card">
                                                     <p className="font-medium">
@@ -184,6 +196,7 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                                 </TableBody>
                             </Table>
                         </div>
+                        <ClientPagination {...pager} />
                     </div>
                 )}
             </div>

@@ -4,6 +4,7 @@ import { FileText, Printer, Search } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { VariantPicker } from '@/components/variant-picker';
+import { ClientPagination, useClientPagination } from '@/components/client-pagination';
 import type { CatalogItem } from '@/components/line-items-editor';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -54,10 +55,21 @@ interface Props {
 export default function StockCardReport({ sites, items, filters, card }: Props) {
     const [siteId, setSiteId] = React.useState<string>(filters.site_id ? String(filters.site_id) : '');
     const [variantId, setVariantId] = React.useState<number | null>(filters.item_variant_id);
+    const [printing, setPrinting] = React.useState(false);
+    const pager = useClientPagination(card?.rows ?? [], 15, printing);
 
     const generate = () => {
         if (!siteId || !variantId) return;
         router.get(route('reports.stock-card'), { site_id: siteId, item_variant_id: variantId }, { preserveState: true });
+    };
+
+    // Render the full ledger before opening the print dialog.
+    const printReport = () => {
+        setPrinting(true);
+        setTimeout(() => {
+            window.print();
+            setPrinting(false);
+        }, 80);
     };
 
     return (
@@ -69,7 +81,7 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                     description="Per-item ledger with running balance (F-INV-002)."
                     icon={FileText}
                     actions={card && (
-                        <Button variant="outline" onClick={() => window.print()} className="no-print">
+                        <Button variant="outline" onClick={printReport} className="no-print">
                             <Printer /> Print
                         </Button>
                     )}
@@ -148,7 +160,7 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                                     {card.rows.length === 0 ? (
                                         <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No movements recorded.</TableCell></TableRow>
                                     ) : (
-                                        card.rows.map((r, i) => (
+                                        pager.paged.map((r, i) => (
                                             <TableRow key={i}>
                                                 <TableCell className="whitespace-nowrap text-sm">{formatDate(r.date)}</TableCell>
                                                 <TableCell className="font-mono text-sm">{r.dr_ws_no ?? '—'}</TableCell>
@@ -173,6 +185,7 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                                 </TableFooter>
                             </Table>
                         </div>
+                        <ClientPagination {...pager} />
                     </div>
                 )}
             </div>

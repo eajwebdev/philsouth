@@ -36,7 +36,7 @@ function Kpi({ label, value, icon: Icon, tone = 'primary' }: {
         success: 'bg-success/15 text-success',
     }[tone];
     return (
-        <Card className="gap-0">
+        <Card className="card-lift gap-0">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
                 <div className={`flex size-9 items-center justify-center rounded-lg ${toneClass}`}><Icon className="size-4.5" /></div>
@@ -259,7 +259,7 @@ interface IcsData {
 
 function QuickAction({ href, icon: Icon, label }: { href: string; icon: typeof Plus; label: string }) {
     return (
-        <Button asChild variant="outline" className="h-auto flex-col gap-2 py-4">
+        <Button asChild variant="outline" className="card-lift h-auto flex-col gap-2 py-4">
             <Link href={href}>
                 <Icon className="size-6 text-primary" />
                 <span className="text-sm font-medium">{label}</span>

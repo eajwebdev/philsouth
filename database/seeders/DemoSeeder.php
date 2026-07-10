@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Models\Item;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\StockService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -47,6 +49,31 @@ class DemoSeeder extends Seeder
         // ICS 2 on QC and Cebu.
         $qc->users()->syncWithoutDetaching([$ics2->id => ['assigned_by' => $eng1->id]]);
         $cebu->users()->syncWithoutDetaching([$ics2->id => ['assigned_by' => $eng2->id]]);
+
+        // Item master
+        $items = collect([
+            ['code' => 'CEM-001', 'description' => 'Portland Cement 40kg', 'uom' => 'bag', 'category' => 'Cement'],
+            ['code' => 'STL-010', 'description' => 'Deformed Bar 10mm x 6m', 'uom' => 'pc', 'category' => 'Steel'],
+            ['code' => 'STL-012', 'description' => 'Deformed Bar 12mm x 6m', 'uom' => 'pc', 'category' => 'Steel'],
+            ['code' => 'AGG-020', 'description' => 'Washed Sand', 'uom' => 'cu.m', 'category' => 'Aggregates'],
+            ['code' => 'AGG-021', 'description' => 'Gravel 3/4"', 'uom' => 'cu.m', 'category' => 'Aggregates'],
+            ['code' => 'PLY-018', 'description' => 'Marine Plywood 18mm', 'uom' => 'pc', 'category' => 'Finishing'],
+            ['code' => 'ELE-101', 'description' => 'THHN Wire #12 (per box)', 'uom' => 'box', 'category' => 'Electrical'],
+            ['code' => 'PLM-055', 'description' => 'PVC Pipe 4" x 3m', 'uom' => 'pc', 'category' => 'Plumbing'],
+        ])->map(fn ($i) => Item::firstOrCreate(['code' => $i['code']], $i));
+
+        // Opening balances posted through the ledger so reports reconcile.
+        $stockService = app(StockService::class);
+        foreach ([$makati, $qc, $cebu] as $site) {
+            foreach ($items as $item) {
+                $stockService->postMovement($site, $item, 'in', 'purchase', fake()->numberBetween(50, 400), [
+                    'movement_date' => now()->subDays(20)->toDateString(),
+                    'remarks' => 'Opening stock',
+                    'created_by' => $admin->id,
+                    'dr_ws_no' => 'OPEN',
+                ]);
+            }
+        }
 
         unset($super);
     }

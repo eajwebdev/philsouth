@@ -2,6 +2,8 @@ import {
     LayoutDashboard,
     Building2,
     Users,
+    Package,
+    Boxes,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -28,6 +30,25 @@ export const NAV_SECTIONS: NavSection[] = [
     {
         items: [
             { label: 'Dashboard', routeName: 'dashboard', icon: LayoutDashboard },
+        ],
+    },
+    {
+        heading: 'Inventory',
+        items: [
+            {
+                label: 'Stock',
+                routeName: 'inventory.index',
+                icon: Boxes,
+                permissions: ['inventory.view'],
+                activeMatch: ['inventory.'],
+            },
+            {
+                label: 'Items',
+                routeName: 'items.index',
+                icon: Package,
+                permissions: ['items.manage', 'inventory.view'],
+                activeMatch: ['items.'],
+            },
         ],
     },
     {

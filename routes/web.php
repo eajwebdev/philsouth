@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\ItemController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteTeamController;
 use App\Http\Controllers\UserController;
@@ -35,6 +37,15 @@ Route::middleware('auth')->group(function () {
     // Per-site ICS assignment (engineer, own sites only)
     Route::get('sites/{site}/team', [SiteTeamController::class, 'edit'])->name('sites.team');
     Route::put('sites/{site}/team', [SiteTeamController::class, 'update'])->name('sites.team.update');
+
+    // Items master
+    Route::get('items', [ItemController::class, 'index'])->name('items.index');
+    Route::post('items', [ItemController::class, 'store'])->name('items.store');
+    Route::put('items/{item}', [ItemController::class, 'update'])->name('items.update');
+    Route::delete('items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
+
+    // Scoped stock views
+    Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

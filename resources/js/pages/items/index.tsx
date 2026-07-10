@@ -1,0 +1,258 @@
+import * as React from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Package, Plus, Pencil, Trash2, Search, Barcode } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { PageHeader } from '@/components/page-header';
+import { DataTable } from '@/components/data-table';
+import { Pagination } from '@/components/pagination';
+import { IconButton } from '@/components/icon-button';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import type { Paginated } from '@/types';
+
+interface ItemRow {
+    id: number;
+    code: string;
+    description: string;
+    uom: string;
+    category: string | null;
+    barcode: string | null;
+    is_active: boolean;
+}
+interface Props {
+    items: Paginated<ItemRow>;
+    filters: { search: string | null };
+    can: { manage: boolean };
+}
+
+export default function ItemsIndex({ items, filters, can }: Props) {
+    const [search, setSearch] = React.useState(filters.search ?? '');
+    const [formOpen, setFormOpen] = React.useState(false);
+    const [editing, setEditing] = React.useState<ItemRow | null>(null);
+    const [deleting, setDeleting] = React.useState<ItemRow | null>(null);
+
+    const onSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        router.get(route('items.index'), { search }, { preserveState: true, replace: true });
+    };
+
+    const columns: ColumnDef<ItemRow>[] = [
+        {
+            accessorKey: 'code',
+            header: 'Code',
+            cell: ({ row }) => <span className="font-mono text-sm font-medium">{row.original.code}</span>,
+        },
+        {
+            accessorKey: 'description',
+            header: 'Description',
+            cell: ({ row }) => (
+                <div>
+                    <p className="font-medium">{row.original.description}</p>
+                    {row.original.category && (
+                        <p className="text-xs text-muted-foreground">{row.original.category}</p>
+                    )}
+                </div>
+            ),
+        },
+        { accessorKey: 'uom', header: 'UoM', cell: ({ row }) => <span className="text-sm">{row.original.uom}</span> },
+        {
+            accessorKey: 'barcode',
+            header: 'Barcode',
+            enableSorting: false,
+            cell: ({ row }) =>
+                row.original.barcode ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                        <Barcode className="size-3.5" /> {row.original.barcode}
+                    </span>
+                ) : (
+                    <span className="text-xs text-muted-foreground/50">—</span>
+                ),
+        },
+        {
+            accessorKey: 'is_active',
+            header: 'Status',
+            cell: ({ row }) =>
+                row.original.is_active ? (
+                    <Badge variant="outline" className="border-success/30 bg-success/10 text-success">Active</Badge>
+                ) : (
+                    <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
+                ),
+        },
+        ...(can.manage
+            ? [{
+                id: 'actions',
+                header: () => <span className="sr-only">Actions</span>,
+                enableSorting: false,
+                cell: ({ row }: { row: { original: ItemRow } }) => (
+                    <div className="flex justify-end gap-0.5">
+                        <IconButton label="Edit" onClick={() => { setEditing(row.original); setFormOpen(true); }}>
+                            <Pencil />
+                        </IconButton>
+                        <IconButton
+                            label="Delete"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleting(row.original)}
+                        >
+                            <Trash2 />
+                        </IconButton>
+                    </div>
+                ),
+            } as ColumnDef<ItemRow>]
+            : []),
+    ];
+
+    return (
+        <>
+            <Head title="Items" />
+            <div className="flex flex-col gap-6">
+                <PageHeader
+                    title="Items master"
+                    description="The shared catalogue of materials used across all sites."
+                    icon={Package}
+                    actions={
+                        can.manage && (
+                            <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+                                <Plus /> New item
+                            </Button>
+                        )
+                    }
+                />
+
+                <form onSubmit={onSearch} className="relative max-w-sm">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, description, barcode…" className="pl-9" />
+                </form>
+
+                <DataTable columns={columns} data={items.data} emptyState="No items yet." />
+                <Pagination meta={items} />
+            </div>
+
+            <ItemFormDialog open={formOpen} onOpenChange={setFormOpen} item={editing} />
+
+            <ConfirmDialog
+                open={!!deleting}
+                onOpenChange={(o) => !o && setDeleting(null)}
+                title={`Delete ${deleting?.code}?`}
+                description="Items with recorded stock movements can't be deleted — deactivate them instead."
+                confirmLabel="Delete item"
+                onConfirm={() => {
+                    if (!deleting) return;
+                    router.delete(route('items.destroy', deleting.id), {
+                        preserveScroll: true,
+                        onFinish: () => setDeleting(null),
+                    });
+                }}
+            />
+        </>
+    );
+}
+
+function ItemFormDialog({
+    open,
+    onOpenChange,
+    item,
+}: {
+    open: boolean;
+    onOpenChange: (o: boolean) => void;
+    item: ItemRow | null;
+}) {
+    const { data, setData, post, put, processing, errors, reset } = useForm({
+        code: '',
+        description: '',
+        uom: '',
+        category: '',
+        barcode: '',
+        is_active: true,
+    });
+
+    React.useEffect(() => {
+        if (open) {
+            setData({
+                code: item?.code ?? '',
+                description: item?.description ?? '',
+                uom: item?.uom ?? '',
+                category: item?.category ?? '',
+                barcode: item?.barcode ?? '',
+                is_active: item?.is_active ?? true,
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, item]);
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const opts = { preserveScroll: true, onSuccess: () => { onOpenChange(false); reset(); } };
+        if (item) put(route('items.update', item.id), opts);
+        else post(route('items.store'), opts);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <form onSubmit={submit}>
+                    <DialogHeader>
+                        <DialogTitle>{item ? 'Edit item' : 'New item'}</DialogTitle>
+                        <DialogDescription>
+                            {item ? 'Update the material details.' : 'Add a material to the catalogue.'}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="col-span-2 grid gap-2">
+                                <Label htmlFor="code">Item code</Label>
+                                <Input id="code" value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="CEM-001" aria-invalid={!!errors.code} />
+                                {errors.code && <p className="text-sm text-destructive">{errors.code}</p>}
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="uom">UoM</Label>
+                                <Input id="uom" value={data.uom} onChange={(e) => setData('uom', e.target.value)} placeholder="bag" aria-invalid={!!errors.uom} />
+                                {errors.uom && <p className="text-sm text-destructive">{errors.uom}</p>}
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="description">Description</Label>
+                            <Input id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Portland Cement 40kg" aria-invalid={!!errors.description} />
+                            {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="grid gap-2">
+                                <Label htmlFor="category">Category</Label>
+                                <Input id="category" value={data.category} onChange={(e) => setData('category', e.target.value)} placeholder="Optional" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="barcode">Barcode / QR</Label>
+                                <Input id="barcode" value={data.barcode} onChange={(e) => setData('barcode', e.target.value)} placeholder="Optional" aria-invalid={!!errors.barcode} />
+                                {errors.barcode && <p className="text-sm text-destructive">{errors.barcode}</p>}
+                            </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                            <Checkbox checked={data.is_active} onCheckedChange={(v) => setData('is_active', v === true)} />
+                            Active
+                        </label>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={processing}>{item ? 'Save changes' : 'Create item'}</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+ItemsIndex.layout = (page: React.ReactNode) => <AppLayout>{page}</AppLayout>;

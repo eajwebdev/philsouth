@@ -16,13 +16,14 @@ class ItemController extends Controller
         $this->authorize('viewAny', Item::class);
 
         $items = Item::query()
+            ->withCount('variants')
             ->when($request->string('search')->isNotEmpty(), function ($q) use ($request) {
                 $s = $request->string('search')->value();
                 $q->where(fn ($w) => $w
                     ->where('code', 'like', "%{$s}%")
                     ->orWhere('description', 'like', "%{$s}%")
-                    ->orWhere('barcode', 'like', "%{$s}%")
-                    ->orWhere('category', 'like', "%{$s}%"));
+                    ->orWhere('category', 'like', "%{$s}%")
+                    ->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', "%{$s}%")->orWhere('barcode', 'like', "%{$s}%")));
             })
             ->orderBy('code')
             ->paginate(20)
@@ -31,9 +32,20 @@ class ItemController extends Controller
         return Inertia::render('items/index', [
             'items' => $items,
             'filters' => ['search' => $request->string('search')->value()],
-            'can' => [
-                'manage' => $request->user()->can('create', Item::class),
-            ],
+            'can' => ['manage' => $request->user()->can('create', Item::class)],
+        ]);
+    }
+
+    public function show(Request $request, Item $item): Response
+    {
+        $this->authorize('view', $item);
+
+        $item->load(['variants' => fn ($q) => $q->orderByDesc('is_default')->orderBy('sku')]);
+        $item->loadCount('variants');
+
+        return Inertia::render('items/show', [
+            'item' => $item,
+            'can' => ['manage' => $request->user()->can('update', $item)],
         ]);
     }
 
@@ -41,6 +53,7 @@ class ItemController extends Controller
     {
         $this->authorize('create', Item::class);
 
+        // The model auto-creates the default variant on create.
         Item::create($this->validateItem($request));
 
         return back()->with('success', 'Item created.');
@@ -59,8 +72,9 @@ class ItemController extends Controller
     {
         $this->authorize('delete', $item);
 
-        if ($item->movements()->exists()) {
-            return back()->with('error', 'Cannot delete an item that has stock movements. Deactivate it instead.');
+        $hasMovements = $item->variants()->whereHas('movements')->exists();
+        if ($hasMovements) {
+            return back()->with('error', 'Cannot delete an item with stock movements. Deactivate it instead.');
         }
 
         $item->delete();
@@ -78,7 +92,7 @@ class ItemController extends Controller
             'description' => ['required', 'string', 'max:255'],
             'uom' => ['required', 'string', 'max:20'],
             'category' => ['nullable', 'string', 'max:100'],
-            'barcode' => ['nullable', 'string', 'max:100', Rule::unique('items', 'barcode')->ignore($item?->id)],
+            'has_variants' => ['boolean'],
             'is_active' => ['boolean'],
         ]);
     }

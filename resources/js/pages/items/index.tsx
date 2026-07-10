@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Package, Plus, Pencil, Trash2, Search, Barcode } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, Search, Boxes, Layers } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { DataTable } from '@/components/data-table';
@@ -29,7 +29,8 @@ interface ItemRow {
     description: string;
     uom: string;
     category: string | null;
-    barcode: string | null;
+    has_variants: boolean;
+    variants_count: number;
     is_active: boolean;
 }
 interface Props {
@@ -59,26 +60,26 @@ export default function ItemsIndex({ items, filters, can }: Props) {
             accessorKey: 'description',
             header: 'Description',
             cell: ({ row }) => (
-                <div>
-                    <p className="font-medium">{row.original.description}</p>
+                <Link href={route('items.show', row.original.id)} className="group block">
+                    <p className="font-medium group-hover:text-primary group-hover:underline">{row.original.description}</p>
                     {row.original.category && (
                         <p className="text-xs text-muted-foreground">{row.original.category}</p>
                     )}
-                </div>
+                </Link>
             ),
         },
         { accessorKey: 'uom', header: 'UoM', cell: ({ row }) => <span className="text-sm">{row.original.uom}</span> },
         {
-            accessorKey: 'barcode',
-            header: 'Barcode',
+            id: 'variants',
+            header: 'Variants',
             enableSorting: false,
             cell: ({ row }) =>
-                row.original.barcode ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                        <Barcode className="size-3.5" /> {row.original.barcode}
-                    </span>
+                row.original.has_variants ? (
+                    <Badge variant="secondary" className="gap-1">
+                        <Layers className="size-3" /> {row.original.variants_count} variants
+                    </Badge>
                 ) : (
-                    <span className="text-xs text-muted-foreground/50">—</span>
+                    <span className="text-xs text-muted-foreground/60">Single</span>
                 ),
         },
         {
@@ -98,6 +99,11 @@ export default function ItemsIndex({ items, filters, can }: Props) {
                 enableSorting: false,
                 cell: ({ row }: { row: { original: ItemRow } }) => (
                     <div className="flex justify-end gap-0.5">
+                        <IconButton label="Manage variants" asChild>
+                            <Link href={route('items.show', row.original.id)}>
+                                <Boxes />
+                            </Link>
+                        </IconButton>
                         <IconButton label="Edit" onClick={() => { setEditing(row.original); setFormOpen(true); }}>
                             <Pencil />
                         </IconButton>
@@ -174,7 +180,7 @@ function ItemFormDialog({
         description: '',
         uom: '',
         category: '',
-        barcode: '',
+        has_variants: false,
         is_active: true,
     });
 
@@ -185,7 +191,7 @@ function ItemFormDialog({
                 description: item?.description ?? '',
                 uom: item?.uom ?? '',
                 category: item?.category ?? '',
-                barcode: item?.barcode ?? '',
+                has_variants: item?.has_variants ?? false,
                 is_active: item?.is_active ?? true,
             });
         }
@@ -228,17 +234,19 @@ function ItemFormDialog({
                             <Input id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Portland Cement 40kg" aria-invalid={!!errors.description} />
                             {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="grid gap-2">
-                                <Label htmlFor="category">Category</Label>
-                                <Input id="category" value={data.category} onChange={(e) => setData('category', e.target.value)} placeholder="Optional" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="barcode">Barcode / QR</Label>
-                                <Input id="barcode" value={data.barcode} onChange={(e) => setData('barcode', e.target.value)} placeholder="Optional" aria-invalid={!!errors.barcode} />
-                                {errors.barcode && <p className="text-sm text-destructive">{errors.barcode}</p>}
-                            </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="category">Category</Label>
+                            <Input id="category" value={data.category} onChange={(e) => setData('category', e.target.value)} placeholder="Optional" />
                         </div>
+                        <label className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                            <Checkbox className="mt-0.5" checked={data.has_variants} onCheckedChange={(v) => setData('has_variants', v === true)} />
+                            <span>
+                                <span className="font-medium">Stocked by variants</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    Enable when this material comes in several specs (sizes, grades). Manage them from the item's page.
+                                </span>
+                            </span>
+                        </label>
                         <label className="flex items-center gap-2 text-sm">
                             <Checkbox checked={data.is_active} onCheckedChange={(v) => setData('is_active', v === true)} />
                             Active

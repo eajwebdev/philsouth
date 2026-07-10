@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('stock_movements', function (Blueprint $table) {
             $table->id();
             $table->foreignId('site_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('item_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('item_variant_id')->constrained()->cascadeOnDelete();
             $table->enum('direction', ['in', 'out']);
             $table->enum('source', [
                 // IN sources
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users');
             $table->timestamps();
 
-            $table->index(['site_id', 'item_id', 'movement_date']);
+            $table->index(['site_id', 'item_variant_id', 'movement_date']);
         });
     }
 

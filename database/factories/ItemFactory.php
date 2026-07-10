@@ -19,7 +19,7 @@ class ItemFactory extends Factory
             'description' => ucfirst($this->faker->words(3, true)),
             'uom' => $this->faker->randomElement(['pc', 'kg', 'bag', 'set', 'm', 'L', 'box']),
             'category' => $this->faker->randomElement(['Cement', 'Steel', 'Electrical', 'Plumbing', 'Hardware', 'Finishing']),
-            'barcode' => null,
+            'has_variants' => false,
             'is_active' => true,
         ];
     }

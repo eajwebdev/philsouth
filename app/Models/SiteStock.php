@@ -14,7 +14,7 @@ class SiteStock extends Model
 
     protected $fillable = [
         'site_id',
-        'item_id',
+        'item_variant_id',
         'location',
         'min_qty',
         'max_qty',
@@ -35,9 +35,9 @@ class SiteStock extends Model
         return $this->belongsTo(Site::class);
     }
 
-    public function item(): BelongsTo
+    public function variant(): BelongsTo
     {
-        return $this->belongsTo(Item::class);
+        return $this->belongsTo(ItemVariant::class, 'item_variant_id');
     }
 
     public function isLowStock(): bool

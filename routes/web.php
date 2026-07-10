@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeliveryReceiptController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ItemVariantController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteTeamController;
 use App\Http\Controllers\UserController;
@@ -40,12 +42,27 @@ Route::middleware('auth')->group(function () {
 
     // Items master
     Route::get('items', [ItemController::class, 'index'])->name('items.index');
+    Route::get('items/{item}', [ItemController::class, 'show'])->name('items.show');
     Route::post('items', [ItemController::class, 'store'])->name('items.store');
     Route::put('items/{item}', [ItemController::class, 'update'])->name('items.update');
     Route::delete('items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
 
+    // Item variants (stockable units)
+    Route::post('items/{item}/variants', [ItemVariantController::class, 'store'])->name('variants.store');
+    Route::put('items/{item}/variants/{variant}', [ItemVariantController::class, 'update'])->name('variants.update');
+    Route::put('items/{item}/variants/{variant}/default', [ItemVariantController::class, 'setDefault'])->name('variants.default');
+    Route::delete('items/{item}/variants/{variant}', [ItemVariantController::class, 'destroy'])->name('variants.destroy');
+
     // Scoped stock views
     Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+
+    // Receiving (delivery receipts)
+    Route::get('receiving', [DeliveryReceiptController::class, 'index'])->name('receiving.index');
+    Route::get('receiving/create', [DeliveryReceiptController::class, 'create'])->name('receiving.create');
+    Route::post('receiving', [DeliveryReceiptController::class, 'store'])->name('receiving.store');
+    Route::get('receiving/{receiving}', [DeliveryReceiptController::class, 'show'])->name('receiving.show');
+    Route::post('receiving/{receiving}/post', [DeliveryReceiptController::class, 'post'])->name('receiving.post');
+    Route::post('receiving/{receiving}/cancel', [DeliveryReceiptController::class, 'cancel'])->name('receiving.cancel');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

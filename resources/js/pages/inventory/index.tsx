@@ -25,7 +25,13 @@ interface StockRow {
     min_qty: string;
     max_qty: string | null;
     balance: string;
-    item: { id: number; code: string; description: string; uom: string; category: string | null };
+    variant: {
+        id: number;
+        sku: string;
+        label: string | null;
+        uom: string | null;
+        item: { id: number; code: string; description: string; uom: string; category: string | null };
+    };
     site: { id: number; code: string; name: string };
 }
 interface Props {
@@ -56,12 +62,18 @@ export default function InventoryIndex({ stock, sites, filters }: Props) {
         {
             id: 'item',
             header: 'Item',
-            cell: ({ row }) => (
-                <div>
-                    <p className="font-medium">{row.original.item.description}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{row.original.item.code}</p>
-                </div>
-            ),
+            cell: ({ row }) => {
+                const v = row.original.variant;
+                return (
+                    <div>
+                        <p className="font-medium">
+                            {v.item.description}
+                            {v.label && <span className="text-muted-foreground"> — {v.label}</span>}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">{v.sku}</p>
+                    </div>
+                );
+            },
         },
         {
             id: 'site',
@@ -91,7 +103,7 @@ export default function InventoryIndex({ stock, sites, filters }: Props) {
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
                     <span className="font-semibold tabular-nums">{formatQty(row.original.balance)}</span>
-                    <span className="text-xs text-muted-foreground">{row.original.item.uom}</span>
+                    <span className="text-xs text-muted-foreground">{row.original.variant.uom ?? row.original.variant.item.uom}</span>
                     {isLow(row.original) && (
                         <Badge variant="outline" className="gap-1 border-warning/40 bg-warning/10 text-warning">
                             <AlertTriangle className="size-3" /> Low

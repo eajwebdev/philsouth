@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Item;
+use App\Models\ItemVariant;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\StockService;
@@ -50,11 +51,9 @@ class DemoSeeder extends Seeder
         $qc->users()->syncWithoutDetaching([$ics2->id => ['assigned_by' => $eng1->id]]);
         $cebu->users()->syncWithoutDetaching([$ics2->id => ['assigned_by' => $eng2->id]]);
 
-        // Item master
-        $items = collect([
+        // Item master — simple items (each auto-creates one default variant).
+        $simple = collect([
             ['code' => 'CEM-001', 'description' => 'Portland Cement 40kg', 'uom' => 'bag', 'category' => 'Cement'],
-            ['code' => 'STL-010', 'description' => 'Deformed Bar 10mm x 6m', 'uom' => 'pc', 'category' => 'Steel'],
-            ['code' => 'STL-012', 'description' => 'Deformed Bar 12mm x 6m', 'uom' => 'pc', 'category' => 'Steel'],
             ['code' => 'AGG-020', 'description' => 'Washed Sand', 'uom' => 'cu.m', 'category' => 'Aggregates'],
             ['code' => 'AGG-021', 'description' => 'Gravel 3/4"', 'uom' => 'cu.m', 'category' => 'Aggregates'],
             ['code' => 'PLY-018', 'description' => 'Marine Plywood 18mm', 'uom' => 'pc', 'category' => 'Finishing'],
@@ -62,11 +61,32 @@ class DemoSeeder extends Seeder
             ['code' => 'PLM-055', 'description' => 'PVC Pipe 4" x 3m', 'uom' => 'pc', 'category' => 'Plumbing'],
         ])->map(fn ($i) => Item::firstOrCreate(['code' => $i['code']], $i));
 
+        // A variant item: one product, several stockable specs.
+        $bar = Item::firstOrCreate(
+            ['code' => 'STL-DB'],
+            ['description' => 'Deformed Reinforcing Bar', 'uom' => 'pc', 'category' => 'Steel', 'has_variants' => true],
+        );
+        // Relabel the auto default and add the real specs.
+        $bar->variants()->where('is_default', true)->update(['sku' => 'STL-DB-10', 'label' => '10mm x 6m']);
+        $barVariants = collect([
+            ['sku' => 'STL-DB-12', 'label' => '12mm x 6m', 'attributes' => ['size' => '12mm', 'length' => '6m']],
+            ['sku' => 'STL-DB-16', 'label' => '16mm x 6m', 'attributes' => ['size' => '16mm', 'length' => '6m']],
+        ])->map(fn ($v) => ItemVariant::firstOrCreate(
+            ['sku' => $v['sku']],
+            [...$v, 'item_id' => $bar->id, 'is_default' => false, 'is_active' => true],
+        ));
+
+        // Every stockable variant across all items.
+        $variants = $simple->map(fn ($i) => $i->defaultVariant)
+            ->concat([$bar->variants()->where('is_default', true)->first()])
+            ->concat($barVariants)
+            ->filter();
+
         // Opening balances posted through the ledger so reports reconcile.
         $stockService = app(StockService::class);
         foreach ([$makati, $qc, $cebu] as $site) {
-            foreach ($items as $item) {
-                $stockService->postMovement($site, $item, 'in', 'purchase', fake()->numberBetween(50, 400), [
+            foreach ($variants as $variant) {
+                $stockService->postMovement($site, $variant, 'in', 'purchase', fake()->numberBetween(50, 400), [
                     'movement_date' => now()->subDays(20)->toDateString(),
                     'remarks' => 'Opening stock',
                     'created_by' => $admin->id,

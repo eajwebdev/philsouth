@@ -13,7 +13,7 @@ class StockMovement extends Model
 
     protected $fillable = [
         'site_id',
-        'item_id',
+        'item_variant_id',
         'direction',
         'source',
         'reference_type',
@@ -47,9 +47,9 @@ class StockMovement extends Model
         return $this->belongsTo(Site::class);
     }
 
-    public function item(): BelongsTo
+    public function variant(): BelongsTo
     {
-        return $this->belongsTo(Item::class);
+        return $this->belongsTo(ItemVariant::class, 'item_variant_id');
     }
 
     public function creator(): BelongsTo

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Item;
+use App\Models\ItemVariant;
 use App\Models\Site;
 use App\Models\SiteStock;
 use App\Models\StockMovement;
@@ -34,7 +34,7 @@ class StockService
      */
     public function postMovement(
         Site $site,
-        Item $item,
+        ItemVariant $variant,
         string $direction,
         string $source,
         float $qty,
@@ -48,18 +48,18 @@ class StockService
             throw new InvalidArgumentException('Movement quantity must be positive.');
         }
 
-        return DB::transaction(function () use ($site, $item, $direction, $source, $qty, $meta) {
-            // 1. Lock (or create) the site_stock row for (site, item).
+        return DB::transaction(function () use ($site, $variant, $direction, $source, $qty, $meta) {
+            // 1. Lock (or create) the site_stock row for (site, variant).
             $stock = SiteStock::query()
                 ->where('site_id', $site->id)
-                ->where('item_id', $item->id)
+                ->where('item_variant_id', $variant->id)
                 ->lockForUpdate()
                 ->first();
 
             if (! $stock) {
                 $stock = SiteStock::create([
                     'site_id' => $site->id,
-                    'item_id' => $item->id,
+                    'item_variant_id' => $variant->id,
                     'balance' => 0,
                 ]);
                 // Re-lock the freshly created row.
@@ -71,7 +71,7 @@ class StockService
             // 2. Guard OUT movements against overdraw (unless allow-negative).
             if ($direction === 'out' && ! config('inventory.allow_negative') && $qty > $current) {
                 throw new RuntimeException(
-                    "Insufficient stock for {$item->code} at {$site->code}: ".
+                    "Insufficient stock for {$variant->sku} at {$site->code}: ".
                     "requested {$qty}, available {$current}."
                 );
             }
@@ -88,7 +88,7 @@ class StockService
 
             return StockMovement::create([
                 'site_id' => $site->id,
-                'item_id' => $item->id,
+                'item_variant_id' => $variant->id,
                 'direction' => $direction,
                 'source' => $source,
                 'reference_type' => $reference?->getMorphClass(),
@@ -105,13 +105,13 @@ class StockService
     }
 
     /**
-     * Current balance for a (site, item) pair.
+     * Current balance for a (site, variant) pair.
      */
-    public function balance(Site $site, Item $item): float
+    public function balance(Site $site, ItemVariant $variant): float
     {
         return (float) (SiteStock::query()
             ->where('site_id', $site->id)
-            ->where('item_id', $item->id)
+            ->where('item_variant_id', $variant->id)
             ->value('balance') ?? 0);
     }
 }

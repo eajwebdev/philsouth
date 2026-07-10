@@ -28,11 +28,14 @@ class InventoryController extends Controller
             ->when($request->boolean('low_only'), fn ($q) => $q->whereColumn('balance', '<=', 'min_qty'))
             ->when($request->string('search')->isNotEmpty(), function ($q) use ($request) {
                 $s = $request->string('search')->value();
-                $q->whereHas('item', fn ($i) => $i
-                    ->where('code', 'like', "%{$s}%")
-                    ->orWhere('description', 'like', "%{$s}%"));
+                $q->whereHas('variant', fn ($v) => $v
+                    ->where('sku', 'like', "%{$s}%")
+                    ->orWhere('barcode', 'like', "%{$s}%")
+                    ->orWhereHas('item', fn ($i) => $i
+                        ->where('code', 'like', "%{$s}%")
+                        ->orWhere('description', 'like', "%{$s}%")));
             })
-            ->with(['item:id,code,description,uom,category', 'site:id,code,name'])
+            ->with(['variant:id,item_id,sku,label,uom', 'variant.item:id,code,description,uom,category', 'site:id,code,name'])
             ->orderBy('site_id')
             ->paginate(25)
             ->withQueryString();

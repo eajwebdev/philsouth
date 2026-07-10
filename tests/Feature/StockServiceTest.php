@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Item;
+use App\Models\ItemVariant;
 use App\Models\Site;
 use App\Models\StockMovement;
 use App\Models\User;
@@ -17,7 +17,7 @@ class StockServiceTest extends TestCase
 
     protected StockService $service;
     protected Site $site;
-    protected Item $item;
+    protected ItemVariant $item;
     protected User $user;
 
     protected function setUp(): void
@@ -25,7 +25,7 @@ class StockServiceTest extends TestCase
         parent::setUp();
         $this->service = app(StockService::class);
         $this->site = Site::factory()->create();
-        $this->item = Item::factory()->create();
+        $this->item = ItemVariant::factory()->create();
         $this->user = User::factory()->create();
         config(['inventory.allow_negative' => false]);
     }
@@ -40,7 +40,7 @@ class StockServiceTest extends TestCase
         $this->assertEquals(100, $this->service->balance($this->site, $this->item));
         $this->assertDatabaseHas('site_stock', [
             'site_id' => $this->site->id,
-            'item_id' => $this->item->id,
+            'item_variant_id' => $this->item->id,
             'balance' => 100,
         ]);
     }

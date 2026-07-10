@@ -4,6 +4,7 @@ import {
     Users,
     Package,
     Boxes,
+    Truck,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -48,6 +49,18 @@ export const NAV_SECTIONS: NavSection[] = [
                 icon: Package,
                 permissions: ['items.manage', 'inventory.view'],
                 activeMatch: ['items.'],
+            },
+        ],
+    },
+    {
+        heading: 'Operations',
+        items: [
+            {
+                label: 'Receiving',
+                routeName: 'receiving.index',
+                icon: Truck,
+                permissions: ['receiving.manage', 'inventory.view'],
+                activeMatch: ['receiving.'],
             },
         ],
     },

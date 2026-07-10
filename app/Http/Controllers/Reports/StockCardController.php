@@ -8,7 +8,9 @@ use App\Models\ItemVariant;
 use App\Models\Site;
 use App\Models\SiteStock;
 use App\Models\StockMovement;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,33 +40,100 @@ class StockCardController extends Controller
         $user = $request->user();
         $siteId = $request->integer('site_id') ?: null;
         $variantId = $request->integer('item_variant_id') ?: null;
+        [$from, $to] = $this->parseRange($request);
 
         $card = null;
         if ($siteId && $variantId) {
             $site = Site::findOrFail($siteId);
             abort_unless($user->canAccessSite($site), 403);
-            $card = $this->buildCard($site, ItemVariant::with('item')->findOrFail($variantId));
+            $card = $this->buildCard($site, ItemVariant::with('item')->findOrFail($variantId), $from, $to);
         }
 
         return Inertia::render('reports/stock-card', [
             'sites' => $user->accessibleSites()->map->only('id', 'code', 'name'),
             'items' => $this->itemOptions(),
-            'filters' => ['site_id' => $siteId, 'item_variant_id' => $variantId],
+            'filters' => [
+                'site_id' => $siteId,
+                'item_variant_id' => $variantId,
+                'from' => $from?->toDateString(),
+                'to' => $to?->toDateString(),
+            ],
             'card' => $card,
         ]);
     }
 
     /**
+     * Stream the stock card as a PDF styled like the F-INV-002 paper form.
+     */
+    public function pdf(Request $request)
+    {
+        abort_unless($request->user()->hasPermissionTo('reports.view'), 403);
+
+        $site = Site::findOrFail($request->integer('site_id'));
+        abort_unless($request->user()->canAccessSite($site), 403);
+
+        $variant = ItemVariant::with('item')->findOrFail($request->integer('item_variant_id'));
+        [$from, $to] = $this->parseRange($request);
+
+        $card = $this->buildCard($site, $variant, $from, $to);
+
+        $label = $from && $to
+            ? $from->format('M j, Y').' – '.$to->format('M j, Y')
+            : null;
+
+        return Pdf::loadView('pdf.stock-card', [
+                'card' => $card,
+                'range' => ['label' => $label],
+            ])
+            ->setPaper('a4', 'portrait')
+            ->stream("stock-card-{$variant->sku}.pdf");
+    }
+
+    /**
+     * Optional inclusive date range filter.
+     *
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    protected function parseRange(Request $request): array
+    {
+        try {
+            $from = $request->filled('from') ? Carbon::parse($request->string('from')->value())->startOfDay() : null;
+            $to = $request->filled('to') ? Carbon::parse($request->string('to')->value())->endOfDay() : null;
+        } catch (\Throwable) {
+            return [null, null];
+        }
+
+        if ($from && $to && $from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return [$from, $to];
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    protected function buildCard(Site $site, ItemVariant $variant): array
+    protected function buildCard(Site $site, ItemVariant $variant, ?Carbon $from = null, ?Carbon $to = null): array
     {
         $header = SiteStock::where('site_id', $site->id)
             ->where('item_variant_id', $variant->id)
             ->first();
 
+        // Balance carried into the period when a range is applied.
+        $broughtForward = null;
+        if ($from) {
+            $bf = StockMovement::where('site_id', $site->id)
+                ->where('item_variant_id', $variant->id)
+                ->whereDate('movement_date', '<', $from->toDateString())
+                ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'in' THEN quantity ELSE -quantity END), 0) AS bal")
+                ->value('bal');
+            $broughtForward = ['date' => $from->toDateString(), 'balance' => (float) $bf];
+        }
+
         $movements = StockMovement::where('site_id', $site->id)
             ->where('item_variant_id', $variant->id)
+            ->when($from, fn ($q) => $q->whereDate('movement_date', '>=', $from->toDateString()))
+            ->when($to, fn ($q) => $q->whereDate('movement_date', '<=', $to->toDateString()))
             ->orderBy('movement_date')
             ->orderBy('id')
             ->get();
@@ -100,6 +169,7 @@ class StockCardController extends Controller
                 'max_qty' => $header?->max_qty !== null ? (float) $header->max_qty : null,
                 'balance' => (float) ($header?->balance ?? 0),
             ],
+            'broughtForward' => $broughtForward,
             'rows' => $rows,
             'totals' => [
                 'in' => $rows->sum(fn ($r) => $r['in'] ?? 0),

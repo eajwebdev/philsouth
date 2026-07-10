@@ -77,6 +77,47 @@ class ItemController extends Controller
         return back()->with('success', 'Item created.');
     }
 
+    /**
+     * JSON quick-create used inline from receiving/withdrawal/transfer forms,
+     * so an ICS or engineer can add every item on a paper receipt on the spot.
+     * Items are global: the new item is visible to ALL sites with 0 stock.
+     */
+    public function quickStore(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('create', Item::class);
+
+        // Code is optional here — auto-generate the next ITM-#### when omitted.
+        if ($request->string('code')->isEmpty()) {
+            $last = Item::where('code', 'like', 'ITM-%')
+                ->orderByRaw('LENGTH(code) DESC')
+                ->orderByDesc('code')
+                ->value('code');
+            $next = $last ? ((int) substr($last, 4)) + 1 : 1;
+            $request->merge(['code' => sprintf('ITM-%04d', $next)]);
+        }
+
+        $item = Item::create($this->validateItem($request));
+        $item->load(['variants' => fn ($q) => $q->orderByDesc('is_default')->orderBy('sku')]);
+
+        return response()->json([
+            'item' => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'description' => $item->description,
+                'uom' => $item->uom,
+                'has_variants' => $item->has_variants,
+                'variants' => $item->variants->map(fn ($v) => [
+                    'id' => $v->id,
+                    'sku' => $v->sku,
+                    'label' => $v->label,
+                    'uom' => $v->uom ?: $item->uom,
+                    'barcode' => $v->barcode,
+                    'is_default' => $v->is_default,
+                ])->values(),
+            ],
+        ], 201);
+    }
+
     public function update(Request $request, Item $item): RedirectResponse
     {
         $this->authorize('update', $item);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Models\Site;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,28 @@ class MonthlySummaryController extends Controller
             'filters' => ['site_id' => $siteId, 'month' => $month],
             'summary' => $summary,
         ]);
+    }
+
+    /**
+     * Stream the monthly summary as a PDF styled like the F-INV-006 paper form
+     * (landscape, U.O.M. column, Prepared by / Checked by signature lines).
+     */
+    public function pdf(Request $request)
+    {
+        abort_unless($request->user()->hasPermissionTo('reports.view'), 403);
+
+        $site = Site::findOrFail($request->integer('site_id'));
+        abort_unless($request->user()->canAccessSite($site), 403);
+
+        $month = $request->string('month')->value() ?: now()->format('Y-m');
+        $summary = $this->buildSummary($site, $month);
+
+        return Pdf::loadView('pdf.monthly-summary', [
+                'summary' => $summary,
+                'preparedBy' => $request->user()->name,
+            ])
+            ->setPaper('a4', 'landscape')
+            ->stream("monthly-summary-{$site->code}-{$month}.pdf");
     }
 
     /**

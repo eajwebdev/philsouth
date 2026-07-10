@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { IconButton } from '@/components/icon-button';
+import { QuickItemDialog } from '@/components/quick-item-dialog';
+import { useAuth } from '@/hooks/use-auth';
 
 export interface CatalogVariant {
     id: number;
@@ -74,16 +76,23 @@ export function LineItemsEditor({
     value,
     onChange,
     withUnit = false,
+    allowCreate = false,
     error,
 }: {
     items: CatalogItem[];
     value: LineItem[];
     onChange: (lines: LineItem[]) => void;
     withUnit?: boolean;
+    /** Show a "New item" button (requires items.manage) so paper-receipt items can be created inline. */
+    allowCreate?: boolean;
     error?: string;
 }) {
+    const { can } = useAuth();
     const [pickerOpen, setPickerOpen] = React.useState(false);
-    const options = React.useMemo(() => flatten(items), [items]);
+    // Items created inline this session — merged with the server-provided catalog.
+    const [created, setCreated] = React.useState<CatalogItem[]>([]);
+    const catalog = React.useMemo(() => [...items, ...created], [items, created]);
+    const options = React.useMemo(() => flatten(catalog), [catalog]);
     const byId = React.useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
 
     const chosenIds = new Set(value.map((l) => l.item_variant_id));
@@ -118,8 +127,20 @@ export function LineItemsEditor({
 
     return (
         <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">Line items</span>
+                <div className="flex items-center gap-2">
+                {allowCreate && can('items.manage') && (
+                    <QuickItemDialog
+                        onCreated={(item) => {
+                            setCreated((prev) => [...prev, item]);
+                            const def = item.variants.find((v) => v.is_default) ?? item.variants[0];
+                            if (def) {
+                                onChange([...value, { item_variant_id: def.id, quantity: '', ...(withUnit ? { unit: def.uom } : {}) }]);
+                            }
+                        }}
+                    />
+                )}
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                     <PopoverTrigger asChild>
                         <Button type="button" variant="outline" size="sm">
@@ -154,9 +175,10 @@ export function LineItemsEditor({
                         </Command>
                     </PopoverContent>
                 </Popover>
+                </div>
             </div>
 
-            <ScanField onScan={onScan} placeholder="Scan a barcode to add a line…" />
+            <ScanField onScan={onScan} placeholder="Scan a barcode to add a line… (optional — you can add items manually)" />
 
             {value.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-center">

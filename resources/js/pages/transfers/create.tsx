@@ -105,7 +105,7 @@ export default function TransferCreate({ fromSites, toSites, items }: Props) {
 
                 <Card>
                     <CardContent className="pt-6">
-                        <LineItemsEditor items={items} value={lines} onChange={setLines} withUnit error={(errors as Record<string, string>).items} />
+                        <LineItemsEditor items={items} value={lines} onChange={setLines} withUnit allowCreate error={(errors as Record<string, string>).items} />
                     </CardContent>
                 </Card>
 

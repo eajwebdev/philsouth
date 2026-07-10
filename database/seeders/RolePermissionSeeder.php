@@ -43,11 +43,15 @@ class RolePermissionSeeder extends Seeder
             ],
             'engineer' => [
                 'assign.ics', 'withdrawal.approve', 'reports.view', 'inventory.view',
+                // Engineers can maintain the item catalog and receive deliveries on their sites.
+                'items.manage', 'receiving.manage',
             ],
             'ics' => [
                 'receiving.manage', 'withdrawal.create', 'withdrawal.release',
                 'withdrawal.receive', 'transfer.create', 'transfer.receive',
                 'reports.view', 'inventory.view',
+                // ICS can add catalog items (e.g. while encoding a delivery receipt).
+                'items.manage',
             ],
         ];
 

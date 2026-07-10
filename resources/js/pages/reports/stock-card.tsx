@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { Head, router } from '@inertiajs/react';
-import { FileText, Printer, Search } from 'lucide-react';
+import { FileText, FileDown, Search } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { VariantPicker } from '@/components/variant-picker';
+import { DateRangePicker, type DateRange } from '@/components/date-range-picker';
 import { ClientPagination, useClientPagination } from '@/components/client-pagination';
 import type { CatalogItem } from '@/components/line-items-editor';
 import { Button } from '@/components/ui/button';
@@ -42,34 +43,49 @@ interface Card {
     site: { id: number; code: string; name: string; address: string | null };
     variant: { id: number; sku: string; label: string | null; uom: string; item: { code: string; description: string } };
     header: { location: string | null; min_qty: number; max_qty: number | null; balance: number };
+    broughtForward: { date: string; balance: number } | null;
     rows: Row[];
     totals: { in: number; out: number };
 }
 interface Props {
     sites: SiteRef[];
     items: CatalogItem[];
-    filters: { site_id: number | null; item_variant_id: number | null };
+    filters: { site_id: number | null; item_variant_id: number | null; from: string | null; to: string | null };
     card: Card | null;
 }
+
+const toYmd = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function StockCardReport({ sites, items, filters, card }: Props) {
     const [siteId, setSiteId] = React.useState<string>(filters.site_id ? String(filters.site_id) : '');
     const [variantId, setVariantId] = React.useState<number | null>(filters.item_variant_id);
-    const [printing, setPrinting] = React.useState(false);
-    const pager = useClientPagination(card?.rows ?? [], 15, printing);
+    const [range, setRange] = React.useState<DateRange | undefined>(
+        filters.from
+            ? { from: new Date(`${filters.from}T00:00:00`), to: filters.to ? new Date(`${filters.to}T00:00:00`) : undefined }
+            : undefined,
+    );
+    const pager = useClientPagination(card?.rows ?? [], 15);
+
+    const params = () => ({
+        site_id: siteId,
+        item_variant_id: variantId,
+        ...(range?.from ? { from: toYmd(range.from) } : {}),
+        ...(range?.to ? { to: toYmd(range.to) } : {}),
+    });
 
     const generate = () => {
         if (!siteId || !variantId) return;
-        router.get(route('reports.stock-card'), { site_id: siteId, item_variant_id: variantId }, { preserveState: true });
+        router.get(route('reports.stock-card'), params(), { preserveState: true });
     };
 
-    // Render the full ledger before opening the print dialog.
-    const printReport = () => {
-        setPrinting(true);
-        setTimeout(() => {
-            window.print();
-            setPrinting(false);
-        }, 80);
+    // Open the F-INV-002 style PDF in a new tab.
+    const viewPdf = () => {
+        if (!siteId || !variantId) return;
+        const query = new URLSearchParams(
+            Object.entries(params()).map(([k, v]) => [k, String(v)]),
+        ).toString();
+        window.open(`${route('reports.stock-card.pdf')}?${query}`, '_blank');
     };
 
     return (
@@ -81,14 +97,14 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                     description="Per-item ledger with running balance (F-INV-002)."
                     icon={FileText}
                     actions={card && (
-                        <Button variant="outline" onClick={printReport} className="no-print">
-                            <Printer /> Print
+                        <Button variant="outline" onClick={viewPdf}>
+                            <FileDown /> View PDF
                         </Button>
                     )}
                 />
 
-                <Card className="no-print">
-                    <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-end">
+                <Card>
+                    <CardContent className="flex flex-col gap-4 pt-6 lg:flex-row lg:items-end">
                         <div className="grid flex-1 gap-2">
                             <Label>Site</Label>
                             <Select value={siteId} onValueChange={setSiteId}>
@@ -102,6 +118,10 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                             <Label>Item</Label>
                             <VariantPicker items={items} value={variantId} onChange={setVariantId} />
                         </div>
+                        <div className="grid gap-2">
+                            <Label>Period</Label>
+                            <DateRangePicker value={range} onChange={setRange} className="w-64" />
+                        </div>
                         <Button onClick={generate} disabled={!siteId || !variantId}>
                             <Search /> Generate
                         </Button>
@@ -109,7 +129,7 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                 </Card>
 
                 {card && (
-                    <div className="print-area rounded-xl border bg-card p-6">
+                    <div className="rounded-xl border bg-card p-6">
                         {/* Report header */}
                         <div className="mb-6 flex items-start justify-between border-b pb-4">
                             <div className="flex items-center gap-3">
@@ -122,7 +142,11 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                             <div className="text-right text-sm">
                                 <p className="font-semibold">{card.site.name}</p>
                                 <p className="text-muted-foreground">{card.site.code}</p>
-                                {card.site.address && <p className="text-xs text-muted-foreground">{card.site.address}</p>}
+                                {filters.from && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {formatDate(filters.from)} – {filters.to ? formatDate(filters.to) : 'today'}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -157,8 +181,17 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
+                                    {card.broughtForward && pager.page === 1 && (
+                                        <TableRow className="bg-muted/40 italic">
+                                            <TableCell className="whitespace-nowrap text-sm">{formatDate(card.broughtForward.date)}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                                            <TableCell colSpan={4} className="text-sm text-muted-foreground">Balance brought forward</TableCell>
+                                            <TableCell className="text-right font-semibold tabular-nums">{formatQty(card.broughtForward.balance)}</TableCell>
+                                            <TableCell />
+                                        </TableRow>
+                                    )}
                                     {card.rows.length === 0 ? (
-                                        <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No movements recorded.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No movements recorded{filters.from ? ' in this period' : ''}.</TableCell></TableRow>
                                     ) : (
                                         pager.paged.map((r, i) => (
                                             <TableRow key={i}>

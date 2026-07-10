@@ -121,7 +121,7 @@ export default function WithdrawalCreate({ sites, items }: Props) {
 
                 <Card>
                     <CardContent className="pt-6">
-                        <LineItemsEditor items={items} value={lines} onChange={setLines} error={(errors as Record<string, string>).items} />
+                        <LineItemsEditor items={items} value={lines} onChange={setLines} allowCreate error={(errors as Record<string, string>).items} />
                     </CardContent>
                 </Card>
 

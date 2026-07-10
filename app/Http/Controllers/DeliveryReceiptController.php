@@ -111,6 +111,70 @@ class DeliveryReceiptController extends Controller
         return redirect()->route('receiving.show', $dr)->with('success', "Draft {$dr->dr_no} created.");
     }
 
+    public function edit(Request $request, DeliveryReceipt $receiving): Response
+    {
+        $this->authorize('update', $receiving);
+
+        $receiving->load('items:id,delivery_receipt_id,item_variant_id,quantity');
+
+        return Inertia::render('receiving/edit', [
+            'receipt' => [
+                'id' => $receiving->id,
+                'dr_no' => $receiving->dr_no,
+                'site_id' => $receiving->site_id,
+                'source' => $receiving->source,
+                'supplier' => $receiving->supplier,
+                'received_date' => $receiving->received_date->toDateString(),
+                'remarks' => $receiving->remarks,
+                'items' => $receiving->items->map(fn ($l) => [
+                    'item_variant_id' => $l->item_variant_id,
+                    'quantity' => (string) (float) $l->quantity,
+                ])->values(),
+            ],
+            'sites' => $request->user()->accessibleSites()->map->only('id', 'code', 'name'),
+            'items' => $this->itemOptions(),
+        ]);
+    }
+
+    public function update(Request $request, DeliveryReceipt $receiving): RedirectResponse
+    {
+        $this->authorize('update', $receiving);
+
+        $data = $this->validateReceipt($request);
+        $site = Site::findOrFail($data['site_id']);
+        abort_unless($request->user()->canAccessSite($site), 403);
+
+        DB::transaction(function () use ($receiving, $data) {
+            $receiving->update([
+                'site_id' => $data['site_id'],
+                'source' => $data['source'],
+                'supplier' => $data['supplier'] ?? null,
+                'received_date' => $data['received_date'],
+                'remarks' => $data['remarks'] ?? null,
+            ]);
+
+            // Replace line items wholesale — the draft has no ledger impact yet.
+            $receiving->items()->delete();
+            foreach ($data['items'] as $line) {
+                $receiving->items()->create($line);
+            }
+        });
+
+        return redirect()->route('receiving.show', $receiving)->with('success', "{$receiving->dr_no} updated.");
+    }
+
+    public function destroy(DeliveryReceipt $receiving): RedirectResponse
+    {
+        $this->authorize('delete', $receiving);
+
+        DB::transaction(function () use ($receiving) {
+            $receiving->items()->delete();
+            $receiving->delete();
+        });
+
+        return redirect()->route('receiving.index')->with('success', "Draft {$receiving->dr_no} deleted.");
+    }
+
     public function show(Request $request, DeliveryReceipt $receiving): Response
     {
         $this->authorize('view', $receiving);
@@ -122,6 +186,8 @@ class DeliveryReceiptController extends Controller
             'can' => [
                 'post' => $request->user()->can('post', $receiving),
                 'cancel' => $request->user()->can('cancel', $receiving),
+                'update' => $request->user()->can('update', $receiving),
+                'delete' => $request->user()->can('delete', $receiving),
             ],
         ]);
     }

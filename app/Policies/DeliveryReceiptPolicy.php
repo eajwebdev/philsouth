@@ -29,6 +29,12 @@ class DeliveryReceiptPolicy
             && $user->canAccessSite($dr->site);
     }
 
+    public function delete(User $user, DeliveryReceipt $dr): bool
+    {
+        // Drafts only — posted receipts are part of the stock ledger.
+        return $this->update($user, $dr);
+    }
+
     public function post(User $user, DeliveryReceipt $dr): bool
     {
         return $this->update($user, $dr);

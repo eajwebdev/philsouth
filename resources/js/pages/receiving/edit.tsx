@@ -19,18 +19,28 @@ import {
 import type { SiteRef } from '@/types';
 
 interface Props {
+    receipt: {
+        id: number;
+        dr_no: string;
+        site_id: number;
+        source: 'supplier' | 'other_project';
+        supplier: string | null;
+        received_date: string;
+        remarks: string | null;
+        items: LineItem[];
+    };
     sites: SiteRef[];
     items: CatalogItem[];
 }
 
-export default function ReceivingCreate({ sites, items }: Props) {
-    const [lines, setLines] = React.useState<LineItem[]>([]);
-    const { data, setData, post, processing, errors, transform } = useForm({
-        site_id: sites[0]?.id ? String(sites[0].id) : '',
-        source: 'supplier' as 'supplier' | 'other_project',
-        supplier: '',
-        received_date: new Date().toISOString().slice(0, 10),
-        remarks: '',
+export default function ReceivingEdit({ receipt, sites, items }: Props) {
+    const [lines, setLines] = React.useState<LineItem[]>(receipt.items);
+    const { data, setData, put, processing, errors, transform } = useForm({
+        site_id: String(receipt.site_id),
+        source: receipt.source,
+        supplier: receipt.supplier ?? '',
+        received_date: receipt.received_date,
+        remarks: receipt.remarks ?? '',
     });
 
     transform((d) => ({
@@ -42,18 +52,18 @@ export default function ReceivingCreate({ sites, items }: Props) {
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('receiving.store'));
+        put(route('receiving.update', receipt.id));
     };
 
     return (
         <>
-            <Head title="New delivery receipt" />
+            <Head title={`Edit ${receipt.dr_no}`} />
             <form onSubmit={submit} className="flex flex-col gap-6">
                 <div>
                     <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-                        <Link href={route('receiving.index')}><ArrowLeft /> Back to receiving</Link>
+                        <Link href={route('receiving.show', receipt.id)}><ArrowLeft /> Back to {receipt.dr_no}</Link>
                     </Button>
-                    <PageHeader title="New delivery receipt" description="Record incoming stock. Posting adds it to the site balance." icon={Truck} />
+                    <PageHeader title={`Edit ${receipt.dr_no}`} description="Update this draft before posting." icon={Truck} />
                 </div>
 
                 <Card>
@@ -106,13 +116,13 @@ export default function ReceivingCreate({ sites, items }: Props) {
 
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" asChild>
-                        <Link href={route('receiving.index')}>Cancel</Link>
+                        <Link href={route('receiving.show', receipt.id)}>Cancel</Link>
                     </Button>
-                    <Button type="submit" disabled={processing || lines.length === 0}>Save draft</Button>
+                    <Button type="submit" disabled={processing || lines.length === 0}>Save changes</Button>
                 </div>
             </form>
         </>
     );
 }
 
-ReceivingCreate.layout = (page: React.ReactNode) => <AppLayout>{page}</AppLayout>;
+ReceivingEdit.layout = (page: React.ReactNode) => <AppLayout>{page}</AppLayout>;

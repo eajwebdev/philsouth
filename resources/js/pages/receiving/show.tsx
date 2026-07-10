@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Truck, PackageCheck, Ban } from 'lucide-react';
+import { ArrowLeft, Truck, PackageCheck, Ban, Pencil, Trash2 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
@@ -44,12 +44,13 @@ interface Receipt {
 }
 interface Props {
     receipt: Receipt;
-    can: { post: boolean; cancel: boolean };
+    can: { post: boolean; cancel: boolean; update: boolean; delete: boolean };
 }
 
 export default function ReceivingShow({ receipt, can }: Props) {
     const [confirmPost, setConfirmPost] = React.useState(false);
     const [confirmCancel, setConfirmCancel] = React.useState(false);
+    const [confirmDelete, setConfirmDelete] = React.useState(false);
 
     return (
         <>
@@ -66,6 +67,16 @@ export default function ReceivingShow({ receipt, can }: Props) {
                         actions={
                             <div className="flex items-center gap-2">
                                 <StatusBadge status={receipt.status} />
+                                {can.update && (
+                                    <Button variant="outline" asChild>
+                                        <Link href={route('receiving.edit', receipt.id)}><Pencil /> Edit</Link>
+                                    </Button>
+                                )}
+                                {can.delete && (
+                                    <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+                                        <Trash2 /> Delete
+                                    </Button>
+                                )}
                                 {can.cancel && (
                                     <Button variant="outline" onClick={() => setConfirmCancel(true)}>
                                         <Ban /> Cancel
@@ -159,6 +170,14 @@ export default function ReceivingShow({ receipt, can }: Props) {
                 description="This voids the draft receipt."
                 confirmLabel="Cancel receipt"
                 onConfirm={() => router.post(route('receiving.cancel', receipt.id), {}, { preserveScroll: true, onFinish: () => setConfirmCancel(false) })}
+            />
+            <ConfirmDialog
+                open={confirmDelete}
+                onOpenChange={setConfirmDelete}
+                title={`Delete ${receipt.dr_no}?`}
+                description="This permanently removes the draft receipt and its lines."
+                confirmLabel="Delete draft"
+                onConfirm={() => router.delete(route('receiving.destroy', receipt.id), { onFinish: () => setConfirmDelete(false) })}
             />
         </>
     );

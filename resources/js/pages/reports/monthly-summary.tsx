@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Head, router } from '@inertiajs/react';
-import { CalendarRange, Printer, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CalendarRange, FileDown, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { ClientPagination, useClientPagination } from '@/components/client-pagination';
@@ -76,21 +76,17 @@ const COLS: { key: keyof Row; label: string; tone?: 'in' | 'out' }[] = [
 export default function MonthlySummaryReport({ sites, filters, summary }: Props) {
     const [siteId, setSiteId] = React.useState<string>(filters.site_id ? String(filters.site_id) : '');
     const [month, setMonth] = React.useState<string>(filters.month);
-    const [printing, setPrinting] = React.useState(false);
-    const pager = useClientPagination(summary?.rows ?? [], 15, printing);
+    const pager = useClientPagination(summary?.rows ?? [], 15);
 
     const generate = () => {
         if (!siteId) return;
         router.get(route('reports.monthly-summary'), { site_id: siteId, month }, { preserveState: true });
     };
 
-    // Render every row before opening the print dialog.
-    const printReport = () => {
-        setPrinting(true);
-        setTimeout(() => {
-            window.print();
-            setPrinting(false);
-        }, 80);
+    // Open the F-INV-006 style PDF (landscape, with U.O.M. + signature lines) in a new tab.
+    const viewPdf = () => {
+        if (!siteId) return;
+        window.open(`${route('reports.monthly-summary.pdf')}?site_id=${siteId}&month=${month}`, '_blank');
     };
 
     return (
@@ -102,8 +98,8 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                     description="Movement aggregation per item for a site and month (F-INV-006)."
                     icon={CalendarRange}
                     actions={summary && (
-                        <Button variant="outline" onClick={printReport} className="no-print">
-                            <Printer /> Print
+                        <Button variant="outline" onClick={viewPdf}>
+                            <FileDown /> View PDF
                         </Button>
                     )}
                 />

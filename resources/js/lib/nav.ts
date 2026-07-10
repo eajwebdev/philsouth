@@ -5,6 +5,7 @@ import {
     Package,
     Boxes,
     Truck,
+    ClipboardList,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -61,6 +62,13 @@ export const NAV_SECTIONS: NavSection[] = [
                 icon: Truck,
                 permissions: ['receiving.manage', 'inventory.view'],
                 activeMatch: ['receiving.'],
+            },
+            {
+                label: 'Withdrawals',
+                routeName: 'withdrawals.index',
+                icon: ClipboardList,
+                permissions: ['withdrawal.create', 'withdrawal.approve', 'withdrawal.release', 'withdrawal.receive', 'inventory.view'],
+                activeMatch: ['withdrawals.'],
             },
         ],
     },

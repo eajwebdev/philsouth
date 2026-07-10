@@ -30,6 +30,8 @@ class PagesRenderTest extends TestCase
             ['items.index', 'items/index'],
             ['inventory.index', 'inventory/index'],
             ['receiving.index', 'receiving/index'],
+            ['withdrawals.index', 'withdrawals/index'],
+            ['withdrawals.create', 'withdrawals/create'],
             ['sites.index', 'sites/index'],
             ['users.index', 'users/index'],
         ];

@@ -9,6 +9,7 @@ use App\Http\Controllers\ItemVariantController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteTeamController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WithdrawalSlipController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -63,6 +64,18 @@ Route::middleware('auth')->group(function () {
     Route::get('receiving/{receiving}', [DeliveryReceiptController::class, 'show'])->name('receiving.show');
     Route::post('receiving/{receiving}/post', [DeliveryReceiptController::class, 'post'])->name('receiving.post');
     Route::post('receiving/{receiving}/cancel', [DeliveryReceiptController::class, 'cancel'])->name('receiving.cancel');
+
+    // Withdrawal slips (F-INV-001) — NO RELEASE WITHOUT APPROVAL
+    Route::get('withdrawals', [WithdrawalSlipController::class, 'index'])->name('withdrawals.index');
+    Route::get('withdrawals/create', [WithdrawalSlipController::class, 'create'])->name('withdrawals.create');
+    Route::post('withdrawals', [WithdrawalSlipController::class, 'store'])->name('withdrawals.store');
+    Route::get('withdrawals/{withdrawal}', [WithdrawalSlipController::class, 'show'])->name('withdrawals.show');
+    Route::post('withdrawals/{withdrawal}/submit', [WithdrawalSlipController::class, 'submit'])->name('withdrawals.submit');
+    Route::post('withdrawals/{withdrawal}/approve', [WithdrawalSlipController::class, 'approve'])->name('withdrawals.approve');
+    Route::post('withdrawals/{withdrawal}/reject', [WithdrawalSlipController::class, 'reject'])->name('withdrawals.reject');
+    Route::post('withdrawals/{withdrawal}/release', [WithdrawalSlipController::class, 'release'])->name('withdrawals.release');
+    Route::post('withdrawals/{withdrawal}/receive', [WithdrawalSlipController::class, 'receive'])->name('withdrawals.receive');
+    Route::post('withdrawals/{withdrawal}/cancel', [WithdrawalSlipController::class, 'cancel'])->name('withdrawals.cancel');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

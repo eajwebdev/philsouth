@@ -8,6 +8,7 @@ import {
     ClipboardList,
     ArrowLeftRight,
     FileText,
+    CalendarRange,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -90,6 +91,13 @@ export const NAV_SECTIONS: NavSection[] = [
                 icon: FileText,
                 permissions: ['reports.view'],
                 activeMatch: ['reports.stock-card'],
+            },
+            {
+                label: 'Monthly Summary',
+                routeName: 'reports.monthly-summary',
+                icon: CalendarRange,
+                permissions: ['reports.view'],
+                activeMatch: ['reports.monthly-summary'],
             },
         ],
     },

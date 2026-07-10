@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryReceiptController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\Reports\MonthlySummaryController;
 use App\Http\Controllers\Reports\StockCardController;
 use App\Http\Controllers\ItemVariantController;
 use App\Http\Controllers\SiteController;
@@ -90,6 +91,7 @@ Route::middleware('auth')->group(function () {
 
     // Reports
     Route::get('reports/stock-card', [StockCardController::class, 'index'])->name('reports.stock-card');
+    Route::get('reports/monthly-summary', [MonthlySummaryController::class, 'index'])->name('reports.monthly-summary');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

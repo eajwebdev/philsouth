@@ -8,6 +8,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemVariantController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteTeamController;
+use App\Http\Controllers\TransferSlipController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WithdrawalSlipController;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +77,15 @@ Route::middleware('auth')->group(function () {
     Route::post('withdrawals/{withdrawal}/release', [WithdrawalSlipController::class, 'release'])->name('withdrawals.release');
     Route::post('withdrawals/{withdrawal}/receive', [WithdrawalSlipController::class, 'receive'])->name('withdrawals.receive');
     Route::post('withdrawals/{withdrawal}/cancel', [WithdrawalSlipController::class, 'cancel'])->name('withdrawals.cancel');
+
+    // Transfer slips (F-INV-004)
+    Route::get('transfers', [TransferSlipController::class, 'index'])->name('transfers.index');
+    Route::get('transfers/create', [TransferSlipController::class, 'create'])->name('transfers.create');
+    Route::post('transfers', [TransferSlipController::class, 'store'])->name('transfers.store');
+    Route::get('transfers/{transfer}', [TransferSlipController::class, 'show'])->name('transfers.show');
+    Route::post('transfers/{transfer}/dispatch', [TransferSlipController::class, 'dispatchTransfer'])->name('transfers.dispatch');
+    Route::post('transfers/{transfer}/receive', [TransferSlipController::class, 'receive'])->name('transfers.receive');
+    Route::post('transfers/{transfer}/cancel', [TransferSlipController::class, 'cancel'])->name('transfers.cancel');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

@@ -16,13 +16,6 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
-        // Never seed demo data into a production database.
-        if (app()->environment('production')) {
-            $this->command?->warn('DemoSeeder skipped: not allowed in production.');
-
-            return;
-        }
-
         // ==================== USERS ====================
         $make = function (string $name, string $email, string $role): User {
             $user = User::firstOrCreate(

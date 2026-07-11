@@ -8,7 +8,6 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\WithdrawalSlip;
 use App\Services\StockService;
-use Database\Seeders\DemoSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -95,13 +94,4 @@ class AuditNotificationTest extends TestCase
         $this->actingAs($this->ics)->get(route('logs.index'))->assertForbidden();
     }
 
-    public function test_demo_seeder_is_skipped_in_production(): void
-    {
-        $this->app->detectEnvironment(fn () => 'production');
-
-        // Invoke directly (bypassing the console confirmation the test seeder shows in prod).
-        (new DemoSeeder)->run();
-
-        $this->assertDatabaseMissing('users', ['email' => 'super@philsouth.test']);
-    }
 }

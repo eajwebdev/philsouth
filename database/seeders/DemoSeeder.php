@@ -34,12 +34,12 @@ class DemoSeeder extends Seeder
             return $user;
         };
 
-        $super = $make('Super Admin', 'super@philsouth.test', 'superadmin');
-        $admin = $make('Ana Administrator', 'admin@philsouth.test', 'administrator');
-        $eng1 = $make('Ed Engineer', 'engineer@philsouth.test', 'engineer');
-        $eng2 = $make('Elly Engineer', 'engineer2@philsouth.test', 'engineer');
-        $ics1 = $make('Ivan ICS', 'ics@philsouth.test', 'ics');
-        $ics2 = $make('Iris ICS', 'ics2@philsouth.test', 'ics');
+        $super = $make('Super Admin', 'super@philsouth', 'superadmin');
+        $admin = $make('Ana Administrator', 'admin@philsouth', 'administrator');
+        $eng1 = $make('Ed Engineer', 'engineer@philsouth', 'engineer');
+        $eng2 = $make('Elly Engineer', 'engineer2@philsouth', 'engineer');
+        $ics1 = $make('Ivan ICS', 'ics@philsouth', 'ics');
+        $ics2 = $make('Iris ICS', 'ics2@philsouth', 'ics');
 
         // ==================== SITES ====================
         $sites = collect([

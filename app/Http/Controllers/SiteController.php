@@ -30,7 +30,7 @@ class SiteController extends Controller
             ])
             ->with(['users' => fn ($q) => $q->whereHas('roles', fn ($r) => $r->whereIn('name', ['engineer', 'ics']))->with('roles:id,name')])
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate(10)
             ->withQueryString();
 
         return Inertia::render('sites/index', [

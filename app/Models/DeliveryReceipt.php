@@ -50,9 +50,24 @@ class DeliveryReceipt extends Model
         return $this->status === 'draft';
     }
 
-    /** Supplier deliveries post as 'purchase'; other-project as 'warehouse_in'. */
+    /**
+     * Map the receipt source to a stock-movement IN source. Supplier deliveries
+     * post as 'purchase'; everything else (another project, or a generic other
+     * source) is an internal 'warehouse_in'.
+     */
     public function movementSource(): string
     {
         return $this->source === 'supplier' ? 'purchase' : 'warehouse_in';
+    }
+
+    /** Human label for the source (used on the receipt + ledger remarks). */
+    public function sourceLabel(): string
+    {
+        return match ($this->source) {
+            'supplier' => $this->supplier ?: 'Supplier',
+            'other_project' => 'Other project',
+            'other' => $this->supplier ?: 'Other source',
+            default => ucfirst(str_replace('_', ' ', $this->source)),
+        };
     }
 }

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowLeftRight, Plus, Eye, Search, ArrowRight } from 'lucide-react';
+import { ArrowLeftRight, Plus, Eye, Search, ArrowRight, FileDown } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { DataTable } from '@/components/data-table';
@@ -74,7 +74,10 @@ export default function TransfersIndex({ transfers, filters, can }: Props) {
             header: () => <span className="sr-only">Actions</span>,
             enableSorting: false,
             cell: ({ row }) => (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-1">
+                    <IconButton label="View PDF" onClick={() => window.open(route('transfers.pdf', row.original.id), '_blank')}>
+                        <FileDown />
+                    </IconButton>
                     <IconButton label="View" asChild>
                         <Link href={route('transfers.show', row.original.id)}><Eye /></Link>
                     </IconButton>

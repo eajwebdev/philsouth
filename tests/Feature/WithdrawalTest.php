@@ -73,6 +73,7 @@ class WithdrawalTest extends TestCase
     {
         $this->actingAs($this->ics)
             ->post(route('withdrawals.store'), [
+                'ws_no' => '320301',
                 'site_id' => $this->site->id,
                 'date' => now()->toDateString(),
                 'requested_by_type' => 'subcon',
@@ -85,6 +86,21 @@ class WithdrawalTest extends TestCase
 
         $this->actingAs($this->ics)->post(route('withdrawals.submit', $ws))->assertRedirect();
         $this->assertEquals('pending_approval', $ws->fresh()->status);
+    }
+
+    public function test_duplicate_booklet_number_is_rejected(): void
+    {
+        $payload = [
+            'ws_no' => '320301',
+            'site_id' => $this->site->id,
+            'date' => now()->toDateString(),
+            'requested_by_type' => 'subcon',
+            'items' => [['item_variant_id' => $this->variant->id, 'qty' => 5]],
+        ];
+
+        $this->actingAs($this->ics)->post(route('withdrawals.store'), $payload)->assertRedirect();
+        $this->actingAs($this->ics)->post(route('withdrawals.store'), $payload)->assertSessionHasErrors('ws_no');
+        $this->assertSame(1, WithdrawalSlip::count());
     }
 
     public function test_engineer_on_the_site_can_approve(): void

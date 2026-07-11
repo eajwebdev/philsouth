@@ -21,6 +21,7 @@ class StockMovement extends Model
         'dr_ws_no',
         'issued_to',
         'quantity',
+        'unit_cost',
         'balance_after',
         'movement_date',
         'remarks',
@@ -31,6 +32,7 @@ class StockMovement extends Model
     {
         return [
             'quantity' => 'decimal:2',
+            'unit_cost' => 'decimal:4',
             'balance_after' => 'decimal:2',
             'movement_date' => 'date',
         ];

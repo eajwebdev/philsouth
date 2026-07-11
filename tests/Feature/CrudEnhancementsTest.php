@@ -136,6 +136,41 @@ class CrudEnhancementsTest extends TestCase
         $this->actingAs($this->ics)->delete(route('receiving.destroy', $dr))->assertForbidden();
     }
 
+    public function test_receipt_from_a_non_site_other_source_posts_as_warehouse_in(): void
+    {
+        $this->actingAs($this->ics)
+            ->post(route('receiving.store'), [
+                'site_id' => $this->site->id,
+                'source' => 'other',
+                'supplier' => 'Client-supplied',
+                'received_date' => now()->toDateString(),
+                'items' => [['item_variant_id' => $this->item->defaultVariant->id, 'quantity' => 12]],
+            ])->assertRedirect();
+
+        $dr = DeliveryReceipt::where('source', 'other')->firstOrFail();
+        $this->assertSame('Client-supplied', $dr->supplier);
+
+        $this->actingAs($this->ics)->post(route('receiving.post', $dr))->assertRedirect();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'site_id' => $this->site->id,
+            'direction' => 'in',
+            'source' => 'warehouse_in',
+            'remarks' => 'Client-supplied',
+        ]);
+    }
+
+    public function test_other_source_does_not_require_a_description(): void
+    {
+        $this->actingAs($this->ics)
+            ->post(route('receiving.store'), [
+                'site_id' => $this->site->id,
+                'source' => 'other',
+                'received_date' => now()->toDateString(),
+                'items' => [['item_variant_id' => $this->item->defaultVariant->id, 'quantity' => 3]],
+            ])->assertRedirect()->assertSessionHasNoErrors();
+    }
+
     // --- PDF report endpoints ---
 
     protected function postStock(): void
@@ -185,8 +220,77 @@ class CrudEnhancementsTest extends TestCase
         $this->actingAs($this->engineer)
             ->get(route('reports.monthly-summary.pdf', [
                 'site_id' => $this->site->id,
-                'month' => now()->format('Y-m'),
+                'from' => now()->startOfMonth()->toDateString(),
+                'to' => now()->endOfMonth()->toDateString(),
             ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_delivery_receipt_pdf_streams(): void
+    {
+        $dr = $this->draft();
+
+        $this->actingAs($this->ics)
+            ->get(route('receiving.pdf', $dr))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_report_csv_exports_stream(): void
+    {
+        $this->postStock();
+
+        $stockCsv = $this->actingAs($this->engineer)
+            ->get(route('reports.stock-card.csv', [
+                'site_id' => $this->site->id,
+                'item_variant_id' => $this->item->defaultVariant->id,
+            ]))->assertOk();
+        $this->assertStringContainsString('text/csv', $stockCsv->headers->get('content-type'));
+
+        $summaryCsv = $this->actingAs($this->engineer)
+            ->get(route('reports.monthly-summary.csv', [
+                'site_id' => $this->site->id,
+                'from' => now()->startOfMonth()->toDateString(),
+                'to' => now()->endOfMonth()->toDateString(),
+            ]))->assertOk();
+        $this->assertStringContainsString('text/csv', $summaryCsv->headers->get('content-type'));
+    }
+
+    public function test_withdrawal_slip_pdf_streams(): void
+    {
+        $ws = \App\Models\WithdrawalSlip::create([
+            'ws_no' => 'WS 1',
+            'site_id' => $this->site->id,
+            'date' => now()->toDateString(),
+            'requested_by_type' => 'group_a',
+            'status' => 'draft',
+            'prepared_by' => $this->ics->id,
+            'created_by' => $this->ics->id,
+        ]);
+        $ws->items()->create(['item_variant_id' => $this->item->defaultVariant->id, 'qty' => 5]);
+
+        $this->actingAs($this->ics)
+            ->get(route('withdrawals.pdf', $ws))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_transfer_slip_pdf_streams(): void
+    {
+        $dest = Site::factory()->create();
+        $ts = \App\Models\TransferSlip::create([
+            'ts_no' => 'TS 1',
+            'from_site_id' => $this->site->id,
+            'to_site_id' => $dest->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+            'created_by' => $this->ics->id,
+        ]);
+        $ts->items()->create(['item_variant_id' => $this->item->defaultVariant->id, 'qty' => 3, 'unit' => 'bag']);
+
+        $this->actingAs($this->ics)
+            ->get(route('transfers.pdf', $ts))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
     }

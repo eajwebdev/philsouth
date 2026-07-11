@@ -21,13 +21,34 @@ class SiteTeamController extends Controller
 
         $user = $request->user();
 
+        $employees = $site->employees()
+            ->with('user:id,email')
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($e) => [
+                'id' => $e->id,
+                'name' => $e->name,
+                'position' => $e->position,
+                'is_active' => $e->is_active,
+                'email' => $e->user?->email,
+                'has_access' => $e->user_id !== null,
+                'pages' => $e->user ? $e->user->getDirectPermissions()->pluck('name')->values() : [],
+            ]);
+
         return Inertia::render('sites/team', [
             'site' => $site->only('id', 'code', 'name', 'address', 'is_active'),
             'engineers' => $site->engineers()->get(['users.id', 'name', 'email']),
             'assignedIcs' => $site->icsUsers()->get(['users.id', 'name', 'email'])->pluck('id'),
             'icsUsers' => User::role('ics')->orderBy('name')->get(['id', 'name', 'email']),
+            'employees' => $employees,
+            // Destinations for moving a roster member to another site.
+            'allSites' => Site::where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
+            'pageCatalog' => config('access.pages'),
             'can' => [
                 'assignIcs' => $user->can('assignIcs', $site),
+                'manageTeam' => $user->can('manageTeam', $site),
+                'grantAccess' => $user->can('grantAccess', $site),
             ],
         ]);
     }

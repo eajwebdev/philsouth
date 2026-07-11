@@ -11,12 +11,14 @@ class DeliveryReceiptItem extends Model
         'delivery_receipt_id',
         'item_variant_id',
         'quantity',
+        'unit_cost',
     ];
 
     protected function casts(): array
     {
         return [
             'quantity' => 'decimal:2',
+            'unit_cost' => 'decimal:2',
         ];
     }
 

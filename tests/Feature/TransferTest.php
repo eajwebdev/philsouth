@@ -73,6 +73,7 @@ class TransferTest extends TestCase
     {
         $this->actingAs($this->icsA)
             ->post(route('transfers.store'), [
+                'ts_no' => '22501',
                 'from_site_id' => $this->siteA->id,
                 'to_site_id' => $this->siteB->id,
                 'date' => now()->toDateString(),

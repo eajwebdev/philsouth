@@ -43,6 +43,7 @@ export interface LineItem {
     item_variant_id: number | null;
     quantity: string;
     unit?: string;
+    unit_cost?: string;
 }
 
 interface FlatOption {
@@ -76,6 +77,7 @@ export function LineItemsEditor({
     value,
     onChange,
     withUnit = false,
+    withCost = false,
     allowCreate = false,
     error,
 }: {
@@ -83,6 +85,8 @@ export function LineItemsEditor({
     value: LineItem[];
     onChange: (lines: LineItem[]) => void;
     withUnit?: boolean;
+    /** Show a per-line unit-cost field (receiving) so inventory can be valued. */
+    withCost?: boolean;
     /** Show a "New item" button (requires items.manage) so paper-receipt items can be created inline. */
     allowCreate?: boolean;
     error?: string;
@@ -210,6 +214,20 @@ export function LineItemsEditor({
                                     />
                                 )}
                                 <div className="flex items-center gap-2">
+                                    {withCost && (
+                                        <div className="relative">
+                                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₱</span>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={line.unit_cost ?? ''}
+                                                onChange={(e) => updateLine(i, { unit_cost: e.target.value })}
+                                                placeholder="Unit cost"
+                                                className="w-28 pl-5"
+                                            />
+                                        </div>
+                                    )}
                                     <Input
                                         type="number"
                                         step="0.01"
@@ -217,7 +235,7 @@ export function LineItemsEditor({
                                         value={line.quantity}
                                         onChange={(e) => updateLine(i, { quantity: e.target.value })}
                                         placeholder="Qty"
-                                        className="w-28"
+                                        className="w-24"
                                     />
                                     <Badge variant="secondary" className="min-w-12 justify-center">{opt?.uom}</Badge>
                                     <IconButton

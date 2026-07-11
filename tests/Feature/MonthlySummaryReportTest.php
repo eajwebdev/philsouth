@@ -38,7 +38,11 @@ class MonthlySummaryReportTest extends TestCase
         $stock->postMovement($site, $variant, 'out', 'usage', 30, ['created_by' => $admin->id, 'movement_date' => $inMonth->toDateString()]);
 
         $this->actingAs($admin)
-            ->get(route('reports.monthly-summary', ['site_id' => $site->id, 'month' => $target->format('Y-m')]))
+            ->get(route('reports.monthly-summary', [
+                'site_id' => $site->id,
+                'from' => $target->toDateString(),
+                'to' => $target->copy()->endOfMonth()->toDateString(),
+            ]))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('reports/monthly-summary')
@@ -67,7 +71,11 @@ class MonthlySummaryReportTest extends TestCase
         $stock->postMovement($site, $variant, 'out', 'loss_damage', 15, ['created_by' => $admin->id, 'movement_date' => $month->copy()->addDays(5)->toDateString()]);
 
         $this->actingAs($admin)
-            ->get(route('reports.monthly-summary', ['site_id' => $site->id, 'month' => $month->format('Y-m')]))
+            ->get(route('reports.monthly-summary', [
+                'site_id' => $site->id,
+                'from' => $month->toDateString(),
+                'to' => $month->copy()->endOfMonth()->toDateString(),
+            ]))
             ->assertInertia(fn ($page) => $page
                 ->where('summary.rows.0.beginning', 0)
                 ->where('summary.rows.0.total_in', 200)

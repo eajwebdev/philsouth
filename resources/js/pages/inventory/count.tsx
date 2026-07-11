@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
-import { ClipboardCheck, Trash2, Check, TriangleAlert } from 'lucide-react';
+import { ClipboardCheck, Trash2, Check, TriangleAlert, Upload, X } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { ScanField } from '@/components/scan-field';
@@ -20,6 +20,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
 import { formatQty } from '@/lib/utils';
 import type { SiteRef } from '@/types';
@@ -82,21 +90,34 @@ export default function PhysicalCount({ sites, items, canAdjust }: Props) {
 
     const onScan = (code: string) => addVariant(-1, code);
 
-    const post = (index: number) => {
-        const row = rows[index];
-        if (row.counted === '') return;
-        setRows((prev) => prev.map((r, i) => (i === index ? { ...r, posting: true } : r)));
+    const setCounted = (variantId: number, value: string) =>
+        setRows((prev) => prev.map((r) => (r.variantId === variantId ? { ...r, counted: value } : r)));
+
+    const remove = (variantId: number) =>
+        setRows((prev) => prev.filter((r) => r.variantId !== variantId));
+
+    const post = (variantId: number) => {
+        const row = rows.find((r) => r.variantId === variantId);
+        if (!row || row.counted === '') return;
+        setRows((prev) => prev.map((r) => (r.variantId === variantId ? { ...r, posting: true } : r)));
         router.post(
             route('inventory.count.store'),
-            { site_id: siteId, item_variant_id: row.variantId, counted_qty: row.counted },
+            { site_id: siteId, item_variant_id: variantId, counted_qty: row.counted },
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => setRows((prev) => prev.filter((_, i) => i !== index)),
-                onError: () => setRows((prev) => prev.map((r, i) => (i === index ? { ...r, posting: false } : r))),
+                onSuccess: () => remove(variantId),
+                onError: () => setRows((prev) => prev.map((r) => (r.variantId === variantId ? { ...r, posting: false } : r))),
             },
         );
     };
+
+    // Post every row that has a counted value, in one pass.
+    const postAll = () => {
+        rows.filter((r) => r.counted !== '' && !r.posting).forEach((r) => post(r.variantId));
+    };
+
+    const readyCount = rows.filter((r) => r.counted !== '').length;
 
     return (
         <>
@@ -136,60 +157,87 @@ export default function PhysicalCount({ sites, items, canAdjust }: Props) {
                 </Card>
 
                 {rows.length > 0 && (
-                    <div className="flex flex-col gap-3">
-                        {rows.map((row, i) => {
-                            const counted = parseFloat(row.counted);
-                            const variance = row.counted === '' || Number.isNaN(counted) ? null : counted - row.system;
-                            return (
-                                <Card key={row.variantId}>
-                                    <CardContent className="flex flex-wrap items-center gap-4 py-4">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="font-medium">{row.label}</p>
-                                            <p className="font-mono text-xs text-muted-foreground">{row.sku}</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-xs text-muted-foreground">System</p>
-                                            <p className="font-semibold tabular-nums">{formatQty(row.system)} {row.uom}</p>
-                                        </div>
-                                        <div className="grid gap-1">
-                                            <Label className="text-xs text-muted-foreground">Counted</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={row.counted}
-                                                autoFocus
-                                                onChange={(e) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, counted: e.target.value } : r)))}
-                                                className="w-28"
-                                            />
-                                        </div>
-                                        <div className="min-w-24 text-center">
-                                            <p className="text-xs text-muted-foreground">Variance</p>
-                                            {variance === null ? (
-                                                <p className="text-muted-foreground/50">—</p>
-                                            ) : variance === 0 ? (
-                                                <Badge variant="outline" className="gap-1 border-success/30 bg-success/10 text-success"><Check className="size-3" /> Match</Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="gap-1 border-warning/40 bg-warning/10 text-warning">
-                                                    <TriangleAlert className="size-3" /> {variance > 0 ? '+' : ''}{formatQty(variance)}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {canAdjust && (
-                                                <Button size="sm" onClick={() => post(i)} disabled={row.counted === '' || row.posting}>
-                                                    Post
-                                                </Button>
-                                            )}
-                                            <IconButton label="Remove" className="text-destructive hover:text-destructive" onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}>
-                                                <Trash2 />
-                                            </IconButton>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </div>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                            <CardTitle className="text-base">
+                                Count list <span className="ml-1 text-sm font-normal text-muted-foreground">{rows.length} item(s) · {readyCount} ready</span>
+                            </CardTitle>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setRows([])}><X /> Clear</Button>
+                                {canAdjust && (
+                                    <Button size="sm" onClick={postAll} disabled={readyCount === 0}>
+                                        <Upload /> Post all ({readyCount})
+                                    </Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto rounded-lg border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead>Item</TableHead>
+                                            <TableHead className="text-right">System</TableHead>
+                                            <TableHead className="w-32">Counted</TableHead>
+                                            <TableHead className="text-center">Variance</TableHead>
+                                            <TableHead className="w-24 text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {rows.map((row) => {
+                                            const counted = parseFloat(row.counted);
+                                            const variance = row.counted === '' || Number.isNaN(counted) ? null : counted - row.system;
+                                            return (
+                                                <TableRow key={row.variantId}>
+                                                    <TableCell>
+                                                        <p className="font-medium leading-tight">{row.label}</p>
+                                                        <p className="font-mono text-xs text-muted-foreground">{row.sku}</p>
+                                                    </TableCell>
+                                                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                                                        {formatQty(row.system)} <span className="text-xs text-muted-foreground">{row.uom}</span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={row.counted}
+                                                            onChange={(e) => setCounted(row.variantId, e.target.value)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') post(row.variantId); }}
+                                                            className="h-8 w-28"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {variance === null ? (
+                                                            <span className="text-muted-foreground/50">—</span>
+                                                        ) : variance === 0 ? (
+                                                            <Badge variant="outline" className="gap-1 border-success/30 bg-success/10 text-success"><Check className="size-3" /> Match</Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="gap-1 border-warning/40 bg-warning/10 text-warning">
+                                                                <TriangleAlert className="size-3" /> {variance > 0 ? '+' : ''}{formatQty(variance)}
+                                                            </Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center justify-end gap-0.5">
+                                                            {canAdjust && (
+                                                                <IconButton label="Post" onClick={() => post(row.variantId)} disabled={row.counted === '' || row.posting}>
+                                                                    <Check />
+                                                                </IconButton>
+                                                            )}
+                                                            <IconButton label="Remove" className="text-destructive hover:text-destructive" onClick={() => remove(row.variantId)}>
+                                                                <Trash2 />
+                                                            </IconButton>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
         </>

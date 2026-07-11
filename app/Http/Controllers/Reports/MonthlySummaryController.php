@@ -36,24 +36,24 @@ class MonthlySummaryController extends Controller
 
         $user = $request->user();
         $siteId = $request->integer('site_id') ?: null;
-        $month = $request->string('month')->value() ?: now()->format('Y-m');
+        [$from, $to] = $this->resolveRange($request);
 
         $summary = null;
         if ($siteId) {
             $site = Site::findOrFail($siteId);
             abort_unless($user->canAccessSite($site), 403);
-            $summary = $this->buildSummary($site, $month);
+            $summary = $this->buildSummary($site, $from, $to);
         }
 
         return Inertia::render('reports/monthly-summary', [
             'sites' => $user->accessibleSites()->map->only('id', 'code', 'name'),
-            'filters' => ['site_id' => $siteId, 'month' => $month],
+            'filters' => ['site_id' => $siteId, 'from' => $from->toDateString(), 'to' => $to->toDateString()],
             'summary' => $summary,
         ]);
     }
 
     /**
-     * Stream the monthly summary as a PDF styled like the F-INV-006 paper form
+     * Stream the summary as a PDF styled like the F-INV-006 paper form
      * (landscape, U.O.M. column, Prepared by / Checked by signature lines).
      */
     public function pdf(Request $request)
@@ -63,24 +63,76 @@ class MonthlySummaryController extends Controller
         $site = Site::findOrFail($request->integer('site_id'));
         abort_unless($request->user()->canAccessSite($site), 403);
 
-        $month = $request->string('month')->value() ?: now()->format('Y-m');
-        $summary = $this->buildSummary($site, $month);
+        [$from, $to] = $this->resolveRange($request);
+        $summary = $this->buildSummary($site, $from, $to);
 
         return Pdf::loadView('pdf.monthly-summary', [
                 'summary' => $summary,
                 'preparedBy' => $request->user()->name,
             ])
-            ->setPaper('a4', 'landscape')
-            ->stream("monthly-summary-{$site->code}-{$month}.pdf");
+            ->setPaper('folio', 'landscape')
+            ->stream("inventory-summary-{$site->code}-{$from->toDateString()}_{$to->toDateString()}.pdf");
+    }
+
+    /**
+     * Export the summary as CSV.
+     */
+    public function csv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_unless($request->user()->hasPermissionTo('reports.view'), 403);
+
+        $site = Site::findOrFail($request->integer('site_id'));
+        abort_unless($request->user()->canAccessSite($site), 403);
+
+        [$from, $to] = $this->resolveRange($request);
+        $summary = $this->buildSummary($site, $from, $to);
+
+        $rows = [[
+            'Item Description', 'U.O.M.', 'Beginning', 'Purchases', 'Warehouse In', 'Transfer In',
+            'Usage', 'Transfer Out', 'Loss & Damages', 'Return to Supplier', 'Warehouse Out', 'Sales/Other', 'Ending',
+        ]];
+        foreach ($summary['rows'] as $r) {
+            $desc = $r['variant']['description'].($r['variant']['label'] ? ' — '.$r['variant']['label'] : '');
+            $rows[] = [
+                $desc, $r['variant']['uom'], $r['beginning'], $r['purchases'], $r['warehouse_in'], $r['transfer_in'],
+                $r['usage'], $r['transfer_out'], $r['loss_damage'], $r['return_supplier'], $r['warehouse_out'], $r['sale_other'], $r['ending'],
+            ];
+        }
+
+        $name = "inventory-summary-{$site->code}-{$from->toDateString()}_{$to->toDateString()}.csv";
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $name, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Resolve the reporting window from the request. Defaults to the current
+     * calendar month. Falls back gracefully if only one bound is supplied.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    protected function resolveRange(Request $request): array
+    {
+        $from = $request->date('from')?->startOfDay() ?? now()->startOfMonth();
+        $to = $request->date('to')?->endOfDay() ?? (clone $from)->endOfMonth();
+
+        if ($to->lt($from)) {
+            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+        }
+
+        return [$from, $to];
     }
 
     /**
      * @return array<string, mixed>
      */
-    protected function buildSummary(Site $site, string $month): array
+    protected function buildSummary(Site $site, Carbon $start, Carbon $end): array
     {
-        $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        $end = (clone $start)->endOfMonth();
         $isClosed = $end->isPast();
 
         // Beginning balance per variant: net of everything before the month.
@@ -189,8 +241,11 @@ class MonthlySummaryController extends Controller
 
         return [
             'site' => $site->only('id', 'code', 'name', 'address'),
-            'month' => $month,
-            'month_label' => $start->format('F Y'),
+            'from' => $start->toDateString(),
+            'to' => $end->toDateString(),
+            'period_label' => $start->isSameDay($end)
+                ? $start->format('M j, Y')
+                : $start->format('M j, Y').' – '.$end->format('M j, Y'),
             'is_closed' => $isClosed,
             'reconciles' => $reconciles,
             'rows' => $rows,

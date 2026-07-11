@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Head, router } from '@inertiajs/react';
-import { CalendarRange, FileDown, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CalendarRange, FileDown, Search, CheckCircle2, AlertTriangle, Sheet } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { ClientPagination, useClientPagination } from '@/components/client-pagination';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateRangePicker, type DateRange } from '@/components/date-range-picker';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,15 +46,16 @@ interface Row {
 }
 interface Summary {
     site: { id: number; code: string; name: string; address: string | null };
-    month: string;
-    month_label: string;
+    from: string;
+    to: string;
+    period_label: string;
     is_closed: boolean;
     reconciles: boolean;
     rows: Row[];
 }
 interface Props {
     sites: SiteRef[];
-    filters: { site_id: number | null; month: string };
+    filters: { site_id: number | null; from: string; to: string };
     summary: Summary | null;
 }
 
@@ -73,20 +74,45 @@ const COLS: { key: keyof Row; label: string; tone?: 'in' | 'out' }[] = [
     { key: 'ending', label: 'Ending' },
 ];
 
+// Parse/format YYYY-MM-DD as a *local* date (avoid the UTC shift of `new Date(str)`).
+const toDate = (s: string | undefined): Date | undefined => {
+    if (!s) return undefined;
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+const toStr = (d: Date | undefined): string =>
+    d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
+
 export default function MonthlySummaryReport({ sites, filters, summary }: Props) {
     const [siteId, setSiteId] = React.useState<string>(filters.site_id ? String(filters.site_id) : '');
-    const [month, setMonth] = React.useState<string>(filters.month);
-    const pager = useClientPagination(summary?.rows ?? [], 15);
+    const [range, setRange] = React.useState<DateRange | undefined>({
+        from: toDate(filters.from),
+        to: toDate(filters.to),
+    });
+    const pager = useClientPagination(summary?.rows ?? [], 10);
+
+    const params = () => ({
+        site_id: siteId,
+        from: toStr(range?.from),
+        to: toStr(range?.to ?? range?.from),
+    });
 
     const generate = () => {
         if (!siteId) return;
-        router.get(route('reports.monthly-summary'), { site_id: siteId, month }, { preserveState: true });
+        router.get(route('reports.monthly-summary'), params(), { preserveState: true });
     };
 
     // Open the F-INV-006 style PDF (landscape, with U.O.M. + signature lines) in a new tab.
     const viewPdf = () => {
         if (!siteId) return;
-        window.open(`${route('reports.monthly-summary.pdf')}?site_id=${siteId}&month=${month}`, '_blank');
+        const p = params();
+        window.open(`${route('reports.monthly-summary.pdf')}?site_id=${p.site_id}&from=${p.from}&to=${p.to}`, '_blank');
+    };
+
+    const exportCsv = () => {
+        if (!siteId) return;
+        const p = params();
+        window.open(`${route('reports.monthly-summary.csv')}?site_id=${p.site_id}&from=${p.from}&to=${p.to}`, '_blank');
     };
 
     return (
@@ -95,12 +121,17 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
             <div className="flex flex-col gap-6">
                 <PageHeader
                     title="Monthly Inventory Summary"
-                    description="Movement aggregation per item for a site and month (F-INV-006)."
+                    description="Movement aggregation per item for a site and date range (F-INV-006)."
                     icon={CalendarRange}
                     actions={summary && (
-                        <Button variant="outline" onClick={viewPdf}>
-                            <FileDown /> View PDF
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={exportCsv}>
+                                <Sheet /> Export CSV
+                            </Button>
+                            <Button variant="outline" onClick={viewPdf}>
+                                <FileDown /> View PDF
+                            </Button>
+                        </div>
                     )}
                 />
 
@@ -116,10 +147,10 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label>Month</Label>
-                            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-48" />
+                            <Label>Date range</Label>
+                            <DateRangePicker value={range} onChange={setRange} placeholder="Select dates" className="w-72" />
                         </div>
-                        <Button onClick={generate} disabled={!siteId}><Search /> Generate</Button>
+                        <Button onClick={generate} disabled={!siteId || !range?.from}><Search /> Generate</Button>
                     </CardContent>
                 </Card>
 
@@ -127,14 +158,14 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                     <div className="print-area rounded-xl border bg-card p-6">
                         <div className="mb-6 flex items-start justify-between border-b pb-4">
                             <div className="flex items-center gap-3">
-                                <img src="/logo.jpg" alt="PhilSouth" className="size-14 rounded-lg object-contain" />
+                                <img src="/logo.png" alt="PhilSouth" className="size-14 rounded-lg object-contain" />
                                 <div>
                                     <h2 className="text-lg font-bold">PhilSouth Builders Inc.</h2>
                                     <p className="text-sm text-muted-foreground">Monthly Inventory Summary · F-INV-006</p>
                                 </div>
                             </div>
                             <div className="text-right text-sm">
-                                <p className="font-semibold">{summary.site.name} · {summary.month_label}</p>
+                                <p className="font-semibold">{summary.site.name} · {summary.period_label}</p>
                                 <p className="text-muted-foreground">{summary.site.code}</p>
                                 {summary.is_closed && (
                                     <Badge
@@ -162,7 +193,7 @@ export default function MonthlySummaryReport({ sites, filters, summary }: Props)
                                 </TableHeader>
                                 <TableBody>
                                     {summary.rows.length === 0 ? (
-                                        <TableRow><TableCell colSpan={COLS.length + 1} className="h-24 text-center text-muted-foreground">No activity for this month.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={COLS.length + 1} className="h-24 text-center text-muted-foreground">No activity for this period.</TableCell></TableRow>
                                     ) : (
                                         pager.paged.map((r) => (
                                             <TableRow key={r.variant.id}>

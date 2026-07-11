@@ -40,7 +40,7 @@
 <div class="meta">
     <span class="lbl">PROJECT:</span> <span class="val">{{ $summary['site']['name'] }} ({{ $summary['site']['code'] }})</span>
     &nbsp;&nbsp;&nbsp;
-    <span class="lbl">FOR THE MONTH OF:</span> <span class="val">{{ strtoupper($summary['month_label']) }}</span>
+    <span class="lbl">PERIOD:</span> <span class="val">{{ strtoupper($summary['period_label']) }}</span>
 </div>
 
 <table class="grid">
@@ -69,15 +69,9 @@
         @php
             $fmt = fn ($n) => $n ? rtrim(rtrim(number_format($n, 2), '0'), '.') : '';
         @endphp
-        @forelse ($summary['rows'] as $r)
+        @foreach ($summary['rows'] as $r)
             <tr>
-                <td>
-                    {{ $r['variant']['description'] }}@if($r['variant']['label']) — {{ $r['variant']['label'] }}@endif
-                    <span style="color:#666">({{ $r['variant']['sku'] }})</span>
-                    @if ($r['adjustment'] != 0)
-                        <span style="color:#666;font-size:7px"> adj. {{ $r['adjustment'] > 0 ? '+' : '' }}{{ $fmt(abs($r['adjustment'])) ?: '0' }}</span>
-                    @endif
-                </td>
+                <td>{{ $r['variant']['description'] }}@if($r['variant']['label']) — {{ $r['variant']['label'] }}@endif</td>
                 <td class="ctr">{{ $r['variant']['uom'] }}</td>
                 <td class="num">{{ $fmt($r['beginning']) }}</td>
                 <td class="num">{{ $fmt($r['purchases']) }}</td>
@@ -91,10 +85,8 @@
                 <td class="num">{{ $fmt($r['sale_other']) }}</td>
                 <td class="num"><b>{{ $fmt($r['ending']) ?: '0' }}</b></td>
             </tr>
-        @empty
-            <tr><td colspan="13" class="ctr" style="padding:12px">No activity for this month.</td></tr>
-        @endforelse
-        @for ($i = 0; $i < max(0, 10 - count($summary['rows'])); $i++)
+        @endforeach
+        @for ($i = 0; $i < max(0, 12 - count($summary['rows'])); $i++)
             <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
         @endfor
     </tbody>
@@ -110,7 +102,6 @@
 <table class="footer">
     <tr>
         <td class="form-no">F-INV-006<br>Rev. 0 6.4.2024</td>
-        <td class="generated">System generated · {{ now()->format('m/d/Y h:i A') }}</td>
     </tr>
 </table>
 

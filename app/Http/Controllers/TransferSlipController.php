@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Item;
 use App\Models\Site;
 use App\Models\TransferSlip;
-use App\Services\NumberService;
+use App\Notifications\WorkflowNotification;
 use App\Services\StockService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,7 +31,7 @@ class TransferSlipController extends Controller
             ->when($request->string('status')->isNotEmpty(), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->string('search')->isNotEmpty(), fn ($q) => $q->where('ts_no', 'like', '%'.$request->string('search')->value().'%'))
             ->latest()
-            ->paginate(15)
+            ->paginate(10)
             ->withQueryString();
 
         return Inertia::render('transfers/index', [
@@ -54,7 +57,7 @@ class TransferSlipController extends Controller
         ]);
     }
 
-    public function store(Request $request, NumberService $numbers): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', TransferSlip::class);
 
@@ -63,9 +66,10 @@ class TransferSlipController extends Controller
         $fromSite = Site::findOrFail($data['from_site_id']);
         abort_unless($request->user()->canAccessSite($fromSite), 403);
 
-        $ts = DB::transaction(function () use ($data, $request, $numbers) {
+        $ts = DB::transaction(function () use ($data, $request) {
             $ts = TransferSlip::create([
-                'ts_no' => $numbers->next('ts'),
+                // Manual entry: the number comes from the pre-printed booklet slip.
+                'ts_no' => trim($data['ts_no']),
                 'from_site_id' => $data['from_site_id'],
                 'to_site_id' => $data['to_site_id'],
                 'date' => $data['date'],
@@ -112,6 +116,26 @@ class TransferSlipController extends Controller
     }
 
     /**
+     * Stream the transfer slip as a PDF laid out like the F-INV-004 paper form.
+     */
+    public function pdf(Request $request, TransferSlip $transfer)
+    {
+        $this->authorize('view', $transfer);
+
+        $transfer->load([
+            'fromSite:id,code,name',
+            'toSite:id,code,name',
+            'items.variant:id,item_id,sku,label,uom',
+            'items.variant.item:id,code,description,uom',
+            'creator:id,name',
+        ]);
+
+        return Pdf::loadView('pdf.transfer-slip', ['transfer' => $transfer])
+            ->setPaper('a4', 'portrait')
+            ->stream("transfer-{$transfer->ts_no}.pdf");
+    }
+
+    /**
      * Dispatch: draft -> in_transit. Posts OUT transfer_out at the origin.
      */
     public function dispatchTransfer(TransferSlip $transfer, Request $request, StockService $stock): RedirectResponse
@@ -145,6 +169,17 @@ class TransferSlipController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
+        AuditLog::record('transfer.dispatched', $transfer, "{$transfer->ts_no} dispatched to {$transfer->toSite->name}");
+        Notification::send(
+            $transfer->toSite->icsUsers()->get(),
+            new WorkflowNotification(
+                'Incoming transfer',
+                "{$transfer->ts_no} from {$transfer->fromSite->name} is in transit to {$transfer->toSite->name}.",
+                route('transfers.show', $transfer->id),
+                'truck',
+            ),
+        );
+
         return back()->with('success', "{$transfer->ts_no} dispatched — stock is in transit.");
     }
 
@@ -160,10 +195,16 @@ class TransferSlipController extends Controller
             'time_received' => ['nullable', 'string', 'max:20'],
         ]);
 
-        $transfer->load('items.variant', 'toSite');
+        $transfer->load('items.variant', 'toSite', 'fromSite');
 
         DB::transaction(function () use ($transfer, $request, $stock, $data) {
             foreach ($transfer->items as $line) {
+                // Carry the origin's moving-average cost so value transfers with the stock.
+                $originCost = \App\Models\SiteStock::query()
+                    ->where('site_id', $transfer->from_site_id)
+                    ->where('item_variant_id', $line->item_variant_id)
+                    ->value('avg_cost');
+
                 $stock->postMovement(
                     $transfer->toSite,
                     $line->variant,
@@ -176,6 +217,7 @@ class TransferSlipController extends Controller
                         'movement_date' => now()->toDateString(),
                         'created_by' => $request->user()->id,
                         'remarks' => 'Transfer from '.$transfer->fromSite->code,
+                        'unit_cost' => $originCost !== null ? (float) $originCost : null,
                     ],
                 );
             }
@@ -187,6 +229,8 @@ class TransferSlipController extends Controller
                 'received_by' => $data['received_by'] ?? $request->user()->name,
             ]);
         });
+
+        AuditLog::record('transfer.received', $transfer, "{$transfer->ts_no} received at {$transfer->toSite->name}");
 
         return back()->with('success', "{$transfer->ts_no} received — stock added at destination.");
     }
@@ -206,6 +250,7 @@ class TransferSlipController extends Controller
     protected function validateSlip(Request $request): array
     {
         return $request->validate([
+            'ts_no' => ['required', 'string', 'max:50', Rule::unique('transfer_slips', 'ts_no')],
             'from_site_id' => ['required', 'integer', Rule::exists('sites', 'id')],
             'to_site_id' => ['required', 'integer', 'different:from_site_id', Rule::exists('sites', 'id')],
             'date' => ['required', 'date'],

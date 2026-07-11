@@ -56,4 +56,30 @@ class SitePolicy
 
         return $user->siteIds()->contains($site->id);
     }
+
+    /**
+     * Manage the site roster (add/edit employees + positions). ICS and engineers
+     * may do this for sites they are assigned to; superadmin/administrator bypass.
+     */
+    public function manageTeam(User $user, Site $site): bool
+    {
+        if (! $user->hasPermissionTo('employees.manage') && ! $user->bypassesSiteScope()) {
+            return false;
+        }
+
+        return $user->canAccessSite($site);
+    }
+
+    /**
+     * Grant/revoke a login + page access for a roster member. Engineers (scoped
+     * admin) and administrators only — not ICS. Scoped to accessible sites.
+     */
+    public function grantAccess(User $user, Site $site): bool
+    {
+        if (! $user->hasPermissionTo('access.grant') && ! $user->bypassesSiteScope()) {
+            return false;
+        }
+
+        return $user->canAccessSite($site);
+    }
 }

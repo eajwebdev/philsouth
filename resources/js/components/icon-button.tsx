@@ -24,21 +24,30 @@ export function IconButton({
     size = 'icon-sm',
     className,
     children,
+    asChild,
     ...props
 }: IconButtonProps) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <Button
-                    type="button"
+                    type={asChild ? undefined : 'button'}
                     variant={variant}
                     size={size}
                     aria-label={label}
                     className={cn(className)}
+                    asChild={asChild}
                     {...props}
                 >
-                    {children}
-                    <span className="sr-only">{label}</span>
+                    {/* With asChild the Button becomes a Radix Slot, which requires
+                        a single child — so skip the extra sr-only span (aria-label
+                        already supplies the accessible name). */}
+                    {asChild ? children : (
+                        <>
+                            {children}
+                            <span className="sr-only">{label}</span>
+                        </>
+                    )}
                 </Button>
             </TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>

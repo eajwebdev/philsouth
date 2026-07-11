@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ClipboardList, Plus, Eye, Search } from 'lucide-react';
+import { ClipboardList, Plus, Eye, Search, FileDown } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { DataTable } from '@/components/data-table';
@@ -70,7 +70,10 @@ export default function WithdrawalsIndex({ slips, filters, can }: Props) {
             header: () => <span className="sr-only">Actions</span>,
             enableSorting: false,
             cell: ({ row }) => (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-1">
+                    <IconButton label="View PDF" onClick={() => window.open(route('withdrawals.pdf', row.original.id), '_blank')}>
+                        <FileDown />
+                    </IconButton>
                     <IconButton label="View" asChild>
                         <Link href={route('withdrawals.show', row.original.id)}><Eye /></Link>
                     </IconButton>

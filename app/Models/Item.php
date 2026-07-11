@@ -19,6 +19,7 @@ class Item extends Model
         'category',
         'has_variants',
         'is_active',
+        'metadata',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class Item extends Model
         return [
             'has_variants' => 'boolean',
             'is_active' => 'boolean',
+            'metadata' => 'array',
         ];
     }
 

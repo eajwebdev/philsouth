@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Truck, PackageCheck, Ban, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Truck, PackageCheck, Ban, Pencil, Trash2, FileDown } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
@@ -32,7 +32,7 @@ interface Line {
 interface Receipt {
     id: number;
     dr_no: string;
-    source: 'supplier' | 'other_project';
+    source: 'supplier' | 'other_project' | 'other';
     supplier: string | null;
     received_date: string;
     remarks: string | null;
@@ -46,6 +46,12 @@ interface Props {
     receipt: Receipt;
     can: { post: boolean; cancel: boolean; update: boolean; delete: boolean };
 }
+
+const SOURCE_LABEL: Record<Receipt['source'], string> = {
+    supplier: 'Supplier',
+    other_project: 'Other project / site',
+    other: 'Other source',
+};
 
 export default function ReceivingShow({ receipt, can }: Props) {
     const [confirmPost, setConfirmPost] = React.useState(false);
@@ -67,6 +73,7 @@ export default function ReceivingShow({ receipt, can }: Props) {
                         actions={
                             <div className="flex items-center gap-2">
                                 <StatusBadge status={receipt.status} />
+                                <Button variant="outline" onClick={() => window.open(route('receiving.pdf', receipt.id), '_blank')}><FileDown /> View PDF</Button>
                                 {can.update && (
                                     <Button variant="outline" asChild>
                                         <Link href={route('receiving.edit', receipt.id)}><Pencil /> Edit</Link>
@@ -92,28 +99,22 @@ export default function ReceivingShow({ receipt, can }: Props) {
                     />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Source</CardTitle></CardHeader>
-                        <CardContent>
-                            <p className="font-medium capitalize">{receipt.source.replace('_', ' ')}</p>
-                            {receipt.supplier && <p className="text-sm text-muted-foreground">{receipt.supplier}</p>}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Site</CardTitle></CardHeader>
-                        <CardContent>
-                            <p className="font-medium">{receipt.site.name}</p>
-                            <Badge variant="secondary" className="mt-1 font-mono">{receipt.site.code}</Badge>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Prepared by</CardTitle></CardHeader>
-                        <CardContent>
-                            <p className="font-medium">{receipt.creator?.name ?? '—'}</p>
-                            {receipt.received_by && <p className="text-sm text-muted-foreground">Received: {receipt.received_by}</p>}
-                        </CardContent>
-                    </Card>
+                {/* Compact detail strip — one row instead of three stacked cards. */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-xl border bg-card p-4 text-sm sm:grid-cols-3">
+                    <div>
+                        <p className="text-xs text-muted-foreground">Source</p>
+                        <p className="font-medium">{SOURCE_LABEL[receipt.source]}</p>
+                        {receipt.supplier && <p className="text-xs text-muted-foreground">{receipt.supplier}</p>}
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Site</p>
+                        <p className="font-medium">{receipt.site.name} <Badge variant="secondary" className="ml-1 font-mono text-[10px]">{receipt.site.code}</Badge></p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Prepared by</p>
+                        <p className="font-medium">{receipt.creator?.name ?? '—'}</p>
+                        {receipt.received_by && <p className="text-xs text-muted-foreground">Received: {receipt.received_by}</p>}
+                    </div>
                 </div>
 
                 <Card>

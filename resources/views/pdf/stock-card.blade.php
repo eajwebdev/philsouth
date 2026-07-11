@@ -39,26 +39,16 @@
 <table class="meta">
     <tr>
         <td class="lbl">Item Description:</td>
-        <td class="val">{{ $card['variant']['item']['description'] }}@if($card['variant']['label']) — {{ $card['variant']['label'] }}@endif ({{ $card['variant']['sku'] }})</td>
+        <td class="val">{{ $card['variant']['item']['description'] }}@if($card['variant']['label']) — {{ $card['variant']['label'] }}@endif</td>
         <td class="lbl">Min:</td>
         <td class="val">{{ rtrim(rtrim(number_format($card['header']['min_qty'], 2), '0'), '.') }}</td>
-        <td class="lbl">U.O.M.:</td>
-        <td class="val">{{ $card['variant']['uom'] }}</td>
     </tr>
     <tr>
         <td class="lbl">Location:</td>
         <td class="val">{{ $card['header']['location'] ?? '' }}&nbsp;</td>
         <td class="lbl">Max:</td>
         <td class="val">{{ $card['header']['max_qty'] !== null ? rtrim(rtrim(number_format($card['header']['max_qty'], 2), '0'), '.') : '' }}&nbsp;</td>
-        <td class="lbl">Project:</td>
-        <td class="val">{{ $card['site']['name'] }} ({{ $card['site']['code'] }})</td>
     </tr>
-    @if (!empty($range['label']))
-    <tr>
-        <td class="lbl">Period:</td>
-        <td class="val" colspan="5">{{ $range['label'] }}</td>
-    </tr>
-    @endif
 </table>
 
 <table class="grid">
@@ -67,63 +57,42 @@
             <th rowspan="2" style="width:9%">Date</th>
             <th rowspan="2" style="width:9%">DR/WS<br>No.</th>
             <th colspan="1">INCOMING</th>
-            <th colspan="1">ISSUANCE</th>
+            <th colspan="2">ISSUANCE</th>
             <th colspan="2">QUANTITY</th>
             <th rowspan="2" style="width:9%">Balance<br>On-Hand</th>
             <th rowspan="2" style="width:14%">Remarks</th>
         </tr>
         <tr>
-            <th style="width:20%">Supplier / Other Projects</th>
-            <th style="width:20%">Issued To</th>
+            <th style="width:18%">Supplier / Other Projects</th>
+            <th style="width:9%">WS No.</th>
+            <th style="width:15%">Issued To</th>
             <th style="width:8%">In</th>
             <th style="width:8%">Out</th>
         </tr>
     </thead>
     <tbody>
-        @if (!empty($card['broughtForward']))
-            <tr class="bf">
-                <td class="ctr">{{ \Illuminate\Support\Carbon::parse($card['broughtForward']['date'])->format('m/d/Y') }}</td>
-                <td class="ctr">—</td>
-                <td colspan="2">Balance brought forward</td>
-                <td></td>
-                <td></td>
-                <td class="num">{{ rtrim(rtrim(number_format($card['broughtForward']['balance'], 2), '0'), '.') }}</td>
-                <td></td>
-            </tr>
-        @endif
-        @forelse ($card['rows'] as $r)
+        @foreach ($card['rows'] as $r)
             <tr>
                 <td class="ctr">{{ \Illuminate\Support\Carbon::parse($r['date'])->format('m/d/Y') }}</td>
-                <td class="ctr">{{ $r['dr_ws_no'] ?? '' }}</td>
+                <td class="ctr">{{ $r['in'] !== null ? ($r['dr_ws_no'] ?? '') : '' }}</td>
                 <td>{{ $r['in'] !== null ? $r['source_label'] : '' }}</td>
-                <td>{{ $r['issued_to'] ?? ($r['out'] !== null ? $r['source_label'] : '') }}</td>
+                <td class="ctr">{{ $r['out'] !== null ? ($r['dr_ws_no'] ?? '') : '' }}</td>
+                <td>{{ $r['issued_to'] ?? '' }}</td>
                 <td class="num">{{ $r['in'] !== null ? rtrim(rtrim(number_format($r['in'], 2), '0'), '.') : '' }}</td>
                 <td class="num">{{ $r['out'] !== null ? rtrim(rtrim(number_format($r['out'], 2), '0'), '.') : '' }}</td>
                 <td class="num">{{ rtrim(rtrim(number_format($r['balance'], 2), '0'), '.') }}</td>
                 <td>{{ $r['remarks'] ?? '' }}</td>
             </tr>
-        @empty
-            <tr><td colspan="8" class="ctr" style="padding:12px">No movements recorded for this period.</td></tr>
-        @endforelse
-        @for ($i = 0; $i < max(0, 8 - count($card['rows'])); $i++)
-            <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        @endforeach
+        @for ($i = 0; $i < max(0, 14 - count($card['rows'])); $i++)
+            <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
         @endfor
     </tbody>
-    <tfoot>
-        <tr>
-            <td colspan="4" class="num">TOTALS</td>
-            <td class="num">{{ rtrim(rtrim(number_format($card['totals']['in'], 2), '0'), '.') }}</td>
-            <td class="num">{{ rtrim(rtrim(number_format($card['totals']['out'], 2), '0'), '.') }}</td>
-            <td class="num">{{ rtrim(rtrim(number_format($card['header']['balance'], 2), '0'), '.') }}</td>
-            <td></td>
-        </tr>
-    </tfoot>
 </table>
 
 <table class="footer">
     <tr>
         <td class="form-no">F-INV-002<br>Rev. 2 01/05/21</td>
-        <td class="generated">System generated · {{ now()->format('m/d/Y h:i A') }}</td>
     </tr>
 </table>
 

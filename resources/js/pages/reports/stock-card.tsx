@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Head, router } from '@inertiajs/react';
-import { FileText, FileDown, Search } from 'lucide-react';
+import { FileText, FileDown, Search, Sheet } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { VariantPicker } from '@/components/variant-picker';
@@ -65,7 +65,7 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
             ? { from: new Date(`${filters.from}T00:00:00`), to: filters.to ? new Date(`${filters.to}T00:00:00`) : undefined }
             : undefined,
     );
-    const pager = useClientPagination(card?.rows ?? [], 15);
+    const pager = useClientPagination(card?.rows ?? [], 10);
 
     const params = () => ({
         site_id: siteId,
@@ -88,6 +88,14 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
         window.open(`${route('reports.stock-card.pdf')}?${query}`, '_blank');
     };
 
+    const exportCsv = () => {
+        if (!siteId || !variantId) return;
+        const query = new URLSearchParams(
+            Object.entries(params()).map(([k, v]) => [k, String(v)]),
+        ).toString();
+        window.open(`${route('reports.stock-card.csv')}?${query}`, '_blank');
+    };
+
     return (
         <>
             <Head title="Stock Card" />
@@ -97,9 +105,14 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                     description="Per-item ledger with running balance (F-INV-002)."
                     icon={FileText}
                     actions={card && (
-                        <Button variant="outline" onClick={viewPdf}>
-                            <FileDown /> View PDF
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={exportCsv}>
+                                <Sheet /> Export CSV
+                            </Button>
+                            <Button variant="outline" onClick={viewPdf}>
+                                <FileDown /> View PDF
+                            </Button>
+                        </div>
                     )}
                 />
 
@@ -133,7 +146,7 @@ export default function StockCardReport({ sites, items, filters, card }: Props) 
                         {/* Report header */}
                         <div className="mb-6 flex items-start justify-between border-b pb-4">
                             <div className="flex items-center gap-3">
-                                <img src="/logo.jpg" alt="PhilSouth" className="size-14 rounded-lg object-contain" />
+                                <img src="/logo.png" alt="PhilSouth" className="size-14 rounded-lg object-contain" />
                                 <div>
                                     <h2 className="text-lg font-bold">PhilSouth Builders Inc.</h2>
                                     <p className="text-sm text-muted-foreground">Site Warehouse Stock Card · F-INV-002</p>

@@ -26,7 +26,7 @@ class ItemController extends Controller
                     ->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', "%{$s}%")->orWhere('barcode', 'like', "%{$s}%")));
             })
             ->orderBy('code')
-            ->paginate(20)
+            ->paginate(10)
             ->withQueryString();
 
         return Inertia::render('items/index', [
@@ -125,6 +125,69 @@ class ItemController extends Controller
         $item->update($this->validateItem($request, $item));
 
         return back()->with('success', 'Item updated.');
+    }
+
+    /**
+     * Bulk-create items from an uploaded CSV. Columns (header row required):
+     * code, description, uom, category. Existing codes are skipped.
+     */
+    public function import(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Item::class);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
+        ]);
+
+        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        if (! $handle) {
+            return back()->with('error', 'Could not read the uploaded file.');
+        }
+
+        $header = null;
+        $created = 0;
+        $skipped = 0;
+        $errors = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            // First non-empty row is the header.
+            if ($header === null) {
+                $header = array_map(fn ($h) => strtolower(trim((string) $h)), $row);
+                continue;
+            }
+            if (count(array_filter($row, fn ($c) => trim((string) $c) !== '')) === 0) {
+                continue;
+            }
+
+            $data = array_combine($header, array_pad($row, count($header), null));
+            $code = trim((string) ($data['code'] ?? ''));
+            $description = trim((string) ($data['description'] ?? ''));
+            $uom = trim((string) ($data['uom'] ?? ''));
+
+            if ($code === '' || $description === '' || $uom === '') {
+                $errors++;
+                continue;
+            }
+            if (Item::where('code', $code)->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            Item::create([
+                'code' => $code,
+                'description' => $description,
+                'uom' => $uom,
+                'category' => trim((string) ($data['category'] ?? '')) ?: null,
+            ]);
+            $created++;
+        }
+        fclose($handle);
+
+        $msg = "Imported {$created} item(s).".
+            ($skipped ? " Skipped {$skipped} existing." : '').
+            ($errors ? " {$errors} row(s) had missing code/description/uom." : '');
+
+        return back()->with($created > 0 ? 'success' : 'error', $msg);
     }
 
     public function destroy(Item $item): RedirectResponse

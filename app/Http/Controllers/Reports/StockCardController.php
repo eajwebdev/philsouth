@@ -85,8 +85,51 @@ class StockCardController extends Controller
                 'card' => $card,
                 'range' => ['label' => $label],
             ])
-            ->setPaper('a4', 'portrait')
+            ->setPaper('folio', 'landscape')
             ->stream("stock-card-{$variant->sku}.pdf");
+    }
+
+    /**
+     * Export the stock card as CSV.
+     */
+    public function csv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_unless($request->user()->hasPermissionTo('reports.view'), 403);
+
+        $site = Site::findOrFail($request->integer('site_id'));
+        abort_unless($request->user()->canAccessSite($site), 403);
+
+        $variant = ItemVariant::with('item')->findOrFail($request->integer('item_variant_id'));
+        [$from, $to] = $this->parseRange($request);
+        $card = $this->buildCard($site, $variant, $from, $to);
+
+        $rows = [['Date', 'DR/WS No.', 'Supplier / Other Projects', 'WS No.', 'Issued To', 'In', 'Out', 'Balance', 'Remarks']];
+        foreach ($card['rows'] as $r) {
+            $rows[] = [
+                Carbon::parse($r['date'])->format('Y-m-d'),
+                $r['in'] !== null ? ($r['dr_ws_no'] ?? '') : '',
+                $r['in'] !== null ? $r['source_label'] : '',
+                $r['out'] !== null ? ($r['dr_ws_no'] ?? '') : '',
+                $r['issued_to'] ?? '',
+                $r['in'], $r['out'], $r['balance'], $r['remarks'] ?? '',
+            ];
+        }
+
+        return $this->streamCsv("stock-card-{$variant->sku}.csv", $rows);
+    }
+
+    /**
+     * @param  array<int, array<int, mixed>>  $rows
+     */
+    protected function streamCsv(string $filename, array $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     /**

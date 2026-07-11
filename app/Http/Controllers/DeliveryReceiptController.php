@@ -31,7 +31,7 @@ class DeliveryReceiptController extends Controller
                 $q->where(fn ($w) => $w->where('dr_no', 'like', "%{$s}%")->orWhere('supplier', 'like', "%{$s}%"));
             })
             ->latest()
-            ->paginate(15)
+            ->paginate(10)
             ->withQueryString();
 
         return Inertia::render('receiving/index', [
@@ -115,7 +115,7 @@ class DeliveryReceiptController extends Controller
     {
         $this->authorize('update', $receiving);
 
-        $receiving->load('items:id,delivery_receipt_id,item_variant_id,quantity');
+        $receiving->load('items:id,delivery_receipt_id,item_variant_id,quantity,unit_cost');
 
         return Inertia::render('receiving/edit', [
             'receipt' => [
@@ -129,6 +129,7 @@ class DeliveryReceiptController extends Controller
                 'items' => $receiving->items->map(fn ($l) => [
                     'item_variant_id' => $l->item_variant_id,
                     'quantity' => (string) (float) $l->quantity,
+                    'unit_cost' => $l->unit_cost !== null ? (string) (float) $l->unit_cost : '',
                 ])->values(),
             ],
             'sites' => $request->user()->accessibleSites()->map->only('id', 'code', 'name'),
@@ -193,6 +194,25 @@ class DeliveryReceiptController extends Controller
     }
 
     /**
+     * Stream the delivery receipt as a printable PDF (internal receiving document).
+     */
+    public function pdf(Request $request, DeliveryReceipt $receiving)
+    {
+        $this->authorize('view', $receiving);
+
+        $receiving->load([
+            'site:id,code,name,address',
+            'items.variant:id,item_id,sku,label,uom',
+            'items.variant.item:id,code,description,uom',
+            'creator:id,name',
+        ]);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.delivery-receipt', ['dr' => $receiving])
+            ->setPaper('a4', 'portrait')
+            ->stream("delivery-receipt-{$receiving->dr_no}.pdf");
+    }
+
+    /**
      * Post the receipt: transition draft → posted and add IN movements.
      */
     public function post(Request $request, DeliveryReceipt $receiving, StockService $stock): RedirectResponse
@@ -214,7 +234,8 @@ class DeliveryReceiptController extends Controller
                         'dr_ws_no' => $receiving->dr_no,
                         'movement_date' => $receiving->received_date->toDateString(),
                         'created_by' => $request->user()->id,
-                        'remarks' => $receiving->source === 'other_project' ? 'From other project' : $receiving->supplier,
+                        'remarks' => $receiving->sourceLabel(),
+                        'unit_cost' => $line->unit_cost !== null ? (float) $line->unit_cost : null,
                     ],
                 );
             }
@@ -224,6 +245,11 @@ class DeliveryReceiptController extends Controller
                 'received_by' => $request->user()->name,
             ]);
         });
+
+        \App\Models\AuditLog::record('receiving.posted', $receiving, "{$receiving->dr_no} posted — stock received", [
+            'source' => $receiving->sourceLabel(),
+            'items' => $receiving->items->count(),
+        ]);
 
         return back()->with('success', "{$receiving->dr_no} posted — stock received.");
     }
@@ -244,13 +270,15 @@ class DeliveryReceiptController extends Controller
     {
         return $request->validate([
             'site_id' => ['required', 'integer', Rule::exists('sites', 'id')],
-            'source' => ['required', Rule::in(['supplier', 'other_project'])],
+            'source' => ['required', Rule::in(['supplier', 'other_project', 'other'])],
+            // Holds the supplier name, or a free-text description when source is "other".
             'supplier' => ['nullable', 'string', 'max:255', Rule::requiredIf($request->input('source') === 'supplier')],
             'received_date' => ['required', 'date'],
             'remarks' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_variant_id' => ['required', 'integer', Rule::exists('item_variants', 'id')],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
         ]);
     }
 }

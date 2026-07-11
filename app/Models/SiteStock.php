@@ -19,6 +19,7 @@ class SiteStock extends Model
         'min_qty',
         'max_qty',
         'balance',
+        'avg_cost',
     ];
 
     protected function casts(): array
@@ -27,7 +28,14 @@ class SiteStock extends Model
             'min_qty' => 'decimal:2',
             'max_qty' => 'decimal:2',
             'balance' => 'decimal:2',
+            'avg_cost' => 'decimal:4',
         ];
+    }
+
+    /** Value of the on-hand balance at moving-average cost. */
+    public function value(): float
+    {
+        return round((float) $this->balance * (float) $this->avg_cost, 2);
     }
 
     public function site(): BelongsTo

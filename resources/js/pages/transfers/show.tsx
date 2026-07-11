@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, ArrowLeftRight, ArrowRight, Send, PackageCheck, Ban, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowRight, Send, PackageCheck, Ban, Truck, FileDown } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
@@ -85,6 +85,7 @@ export default function TransferShow({ transfer, can }: Props) {
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <StatusBadge status={transfer.status} />
+                                <Button variant="outline" onClick={() => window.open(route('transfers.pdf', transfer.id), '_blank')}><FileDown /> View PDF</Button>
                                 {can.cancel && <Button variant="outline" onClick={() => setConfirm('cancel')}><Ban /> Cancel</Button>}
                                 {can.dispatch && <Button onClick={() => setConfirm('dispatch')}><Send /> Dispatch</Button>}
                                 {can.receive && <Button onClick={() => setReceiveOpen(true)}><PackageCheck /> Receive</Button>}

@@ -10,6 +10,7 @@ import {
     PackageOpen,
     Ban,
     CircleCheck,
+    FileDown,
 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
@@ -164,6 +165,7 @@ export default function WithdrawalShow({ slip, can }: Props) {
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <StatusBadge status={slip.status} />
+                                <Button variant="outline" onClick={() => window.open(route('withdrawals.pdf', slip.id), '_blank')}><FileDown /> View PDF</Button>
                                 {can.cancel && (
                                     <Button variant="outline" onClick={() => setConfirm('cancel')}><Ban /> Cancel</Button>
                                 )}
@@ -195,37 +197,27 @@ export default function WithdrawalShow({ slip, can }: Props) {
                     </div>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Site</CardTitle></CardHeader>
-                        <CardContent>
-                            <p className="font-medium">{slip.site.name}</p>
-                            <Badge variant="secondary" className="mt-1 font-mono">{slip.site.code}</Badge>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Requested by</CardTitle></CardHeader>
-                        <CardContent>
-                            <p className="font-medium capitalize">{requestedBy}</p>
-                            {slip.delivered_to && <p className="text-sm text-muted-foreground">To: {slip.delivered_to}</p>}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Prepared / approved</CardTitle></CardHeader>
-                        <CardContent className="text-sm">
-                            <p>{slip.prepared_by?.name ?? '—'}</p>
-                            {slip.approved_by && (
-                                <p className="text-muted-foreground">Approved by {slip.approved_by.name}</p>
-                            )}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Released / received</CardTitle></CardHeader>
-                        <CardContent className="text-sm">
-                            <p>{slip.released_by ? slip.released_by.name : '—'}</p>
-                            {slip.received_by && <p className="text-muted-foreground">Received: {slip.received_by}</p>}
-                        </CardContent>
-                    </Card>
+                {/* Compact detail strip — one row instead of four stacked cards. */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-xl border bg-card p-4 text-sm sm:grid-cols-4">
+                    <div>
+                        <p className="text-xs text-muted-foreground">Site</p>
+                        <p className="font-medium">{slip.site.name} <Badge variant="secondary" className="ml-1 font-mono text-[10px]">{slip.site.code}</Badge></p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Requested by</p>
+                        <p className="font-medium capitalize">{requestedBy}</p>
+                        {slip.delivered_to && <p className="text-xs text-muted-foreground">To: {slip.delivered_to}</p>}
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Prepared / approved</p>
+                        <p className="font-medium">{slip.prepared_by?.name ?? '—'}</p>
+                        {slip.approved_by && <p className="text-xs text-muted-foreground">Approved by {slip.approved_by.name}</p>}
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Released / received</p>
+                        <p className="font-medium">{slip.released_by ? slip.released_by.name : '—'}</p>
+                        {slip.received_by && <p className="text-xs text-muted-foreground">Received: {slip.received_by}</p>}
+                    </div>
                 </div>
 
                 <Card>

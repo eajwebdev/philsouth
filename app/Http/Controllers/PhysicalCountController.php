@@ -63,6 +63,13 @@ class PhysicalCountController extends Controller
             ],
         );
 
+        \App\Models\AuditLog::record('inventory.adjusted', $site, "Physical count adjustment for {$variant->sku}", [
+            'variant' => $variant->sku,
+            'system' => $system,
+            'counted' => (float) $data['counted_qty'],
+            'variance' => $variance,
+        ], $site->id);
+
         $sign = $variance > 0 ? '+' : '';
         return back()->with('success', "Adjustment posted for {$variant->sku}: {$sign}{$variance}.");
     }

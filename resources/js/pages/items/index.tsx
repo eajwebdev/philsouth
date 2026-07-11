@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Package, Plus, Pencil, Trash2, Search, Boxes, Layers } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, Search, Boxes, Layers, Upload } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { DataTable } from '@/components/data-table';
@@ -42,6 +42,7 @@ interface Props {
 export default function ItemsIndex({ items, filters, can }: Props) {
     const [search, setSearch] = React.useState(filters.search ?? '');
     const [formOpen, setFormOpen] = React.useState(false);
+    const [importOpen, setImportOpen] = React.useState(false);
     const [editing, setEditing] = React.useState<ItemRow | null>(null);
     const [deleting, setDeleting] = React.useState<ItemRow | null>(null);
 
@@ -130,9 +131,14 @@ export default function ItemsIndex({ items, filters, can }: Props) {
                     icon={Package}
                     actions={
                         can.manage && (
-                            <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
-                                <Plus /> New item
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" onClick={() => setImportOpen(true)}>
+                                    <Upload /> Import CSV
+                                </Button>
+                                <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+                                    <Plus /> New item
+                                </Button>
+                            </div>
                         )
                     }
                 />
@@ -147,6 +153,7 @@ export default function ItemsIndex({ items, filters, can }: Props) {
             </div>
 
             <ItemFormDialog open={formOpen} onOpenChange={setFormOpen} item={editing} />
+            <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
             <ConfirmDialog
                 open={!!deleting}
@@ -163,6 +170,45 @@ export default function ItemsIndex({ items, filters, can }: Props) {
                 }}
             />
         </>
+    );
+}
+
+function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+    const { setData, post, processing, errors, reset } = useForm<{ file: File | null }>({ file: null });
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post(route('items.import'), {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => { reset(); onOpenChange(false); },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <form onSubmit={submit}>
+                    <DialogHeader>
+                        <DialogTitle>Import items from CSV</DialogTitle>
+                        <DialogDescription>
+                            Header row required with columns: <span className="font-mono">code, description, uom, category</span>.
+                            Existing codes are skipped.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2 py-4">
+                        <Label htmlFor="csv">CSV file</Label>
+                        <Input id="csv" type="file" accept=".csv,text/csv" onChange={(e) => setData('file', e.target.files?.[0] ?? null)} />
+                        {errors.file && <p className="text-sm text-destructive">{errors.file}</p>}
+                        <p className="text-xs text-muted-foreground">Example: <span className="font-mono">CEM-001,Portland Cement 40kg,bag,Cement</span></p>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={processing}>Import</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

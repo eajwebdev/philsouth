@@ -7,6 +7,7 @@ import { AppLogo } from '@/components/app-logo';
 import { NavLinks } from '@/components/nav-sidebar';
 import { SiteSwitcher } from '@/components/site-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NotificationBell } from '@/components/notification-bell';
 import { UserMenu } from '@/components/user-menu';
 
 export function TopBar() {
@@ -41,6 +42,7 @@ export function TopBar() {
             </div>
 
             <div className="ml-auto flex items-center gap-1.5">
+                <NotificationBell />
                 <ThemeToggle />
                 <UserMenu />
             </div>

@@ -23,7 +23,7 @@ class PagesRenderTest extends TestCase
     public function test_core_pages_render_for_superadmin(): void
     {
         $super = User::where('email', 'super@philsouth.test')->firstOrFail();
-        $item = Item::where('code', 'STL-DB')->firstOrFail();
+        $item = Item::where('code', 'PS-ST-REBAR')->firstOrFail();
 
         $pages = [
             ['dashboard', 'dashboard'],

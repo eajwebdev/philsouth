@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DeliveryReceiptController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\PhysicalCountController;
@@ -26,7 +29,8 @@ Route::get('/', function () {
 // Guest
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    // Brute-force protection: 6 attempts/min per IP+email (see LoginRequest for the per-credential limiter).
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:6,1');
 });
 
 // Authenticated
@@ -46,11 +50,21 @@ Route::middleware('auth')->group(function () {
     Route::get('sites/{site}/team', [SiteTeamController::class, 'edit'])->name('sites.team');
     Route::put('sites/{site}/team', [SiteTeamController::class, 'update'])->name('sites.team.update');
 
+    // Site personnel roster + per-user page access (engineer/ICS scoped to their sites)
+    Route::post('sites/{site}/employees', [EmployeeController::class, 'store'])->name('employees.store');
+    Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+    Route::post('employees/{employee}/transfer', [EmployeeController::class, 'transfer'])->name('employees.transfer');
+    Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+    Route::post('employees/{employee}/access', [EmployeeController::class, 'grantAccess'])->name('employees.access.grant');
+    Route::put('employees/{employee}/access', [EmployeeController::class, 'updateAccess'])->name('employees.access.update');
+    Route::delete('employees/{employee}/access', [EmployeeController::class, 'revokeAccess'])->name('employees.access.revoke');
+
     // Items master
     Route::get('items', [ItemController::class, 'index'])->name('items.index');
     Route::get('items/{item}/labels', [ItemController::class, 'labels'])->name('items.labels');
     Route::get('items/{item}', [ItemController::class, 'show'])->name('items.show');
     Route::post('items', [ItemController::class, 'store'])->name('items.store');
+    Route::post('items/import', [ItemController::class, 'import'])->name('items.import');
     Route::post('items/quick', [ItemController::class, 'quickStore'])->name('items.quick-store');
     Route::put('items/{item}', [ItemController::class, 'update'])->name('items.update');
     Route::delete('items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
@@ -63,6 +77,8 @@ Route::middleware('auth')->group(function () {
 
     // Scoped stock views
     Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::get('inventory/reorder', [InventoryController::class, 'reorder'])->name('inventory.reorder');
+    Route::put('inventory/{stock}/thresholds', [InventoryController::class, 'updateThresholds'])->name('inventory.thresholds');
 
     // Scanning + physical count
     Route::get('scan/lookup', [ScanController::class, 'lookup'])->name('scan.lookup');
@@ -76,6 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::get('receiving/{receiving}/edit', [DeliveryReceiptController::class, 'edit'])->name('receiving.edit');
     Route::put('receiving/{receiving}', [DeliveryReceiptController::class, 'update'])->name('receiving.update');
     Route::delete('receiving/{receiving}', [DeliveryReceiptController::class, 'destroy'])->name('receiving.destroy');
+    Route::get('receiving/{receiving}/pdf', [DeliveryReceiptController::class, 'pdf'])->name('receiving.pdf');
     Route::get('receiving/{receiving}', [DeliveryReceiptController::class, 'show'])->name('receiving.show');
     Route::post('receiving/{receiving}/post', [DeliveryReceiptController::class, 'post'])->name('receiving.post');
     Route::post('receiving/{receiving}/cancel', [DeliveryReceiptController::class, 'cancel'])->name('receiving.cancel');
@@ -84,6 +101,7 @@ Route::middleware('auth')->group(function () {
     Route::get('withdrawals', [WithdrawalSlipController::class, 'index'])->name('withdrawals.index');
     Route::get('withdrawals/create', [WithdrawalSlipController::class, 'create'])->name('withdrawals.create');
     Route::post('withdrawals', [WithdrawalSlipController::class, 'store'])->name('withdrawals.store');
+    Route::get('withdrawals/{withdrawal}/pdf', [WithdrawalSlipController::class, 'pdf'])->name('withdrawals.pdf');
     Route::get('withdrawals/{withdrawal}', [WithdrawalSlipController::class, 'show'])->name('withdrawals.show');
     Route::post('withdrawals/{withdrawal}/submit', [WithdrawalSlipController::class, 'submit'])->name('withdrawals.submit');
     Route::post('withdrawals/{withdrawal}/approve', [WithdrawalSlipController::class, 'approve'])->name('withdrawals.approve');
@@ -96,6 +114,7 @@ Route::middleware('auth')->group(function () {
     Route::get('transfers', [TransferSlipController::class, 'index'])->name('transfers.index');
     Route::get('transfers/create', [TransferSlipController::class, 'create'])->name('transfers.create');
     Route::post('transfers', [TransferSlipController::class, 'store'])->name('transfers.store');
+    Route::get('transfers/{transfer}/pdf', [TransferSlipController::class, 'pdf'])->name('transfers.pdf');
     Route::get('transfers/{transfer}', [TransferSlipController::class, 'show'])->name('transfers.show');
     Route::post('transfers/{transfer}/dispatch', [TransferSlipController::class, 'dispatchTransfer'])->name('transfers.dispatch');
     Route::post('transfers/{transfer}/receive', [TransferSlipController::class, 'receive'])->name('transfers.receive');
@@ -104,8 +123,16 @@ Route::middleware('auth')->group(function () {
     // Reports
     Route::get('reports/stock-card', [StockCardController::class, 'index'])->name('reports.stock-card');
     Route::get('reports/stock-card/pdf', [StockCardController::class, 'pdf'])->name('reports.stock-card.pdf');
+    Route::get('reports/stock-card/csv', [StockCardController::class, 'csv'])->name('reports.stock-card.csv');
     Route::get('reports/monthly-summary', [MonthlySummaryController::class, 'index'])->name('reports.monthly-summary');
     Route::get('reports/monthly-summary/pdf', [MonthlySummaryController::class, 'pdf'])->name('reports.monthly-summary.pdf');
+    Route::get('reports/monthly-summary/csv', [MonthlySummaryController::class, 'csv'])->name('reports.monthly-summary.csv');
+
+    // Notifications (in-app bell)
+    Route::post('notifications/read/{id?}', [NotificationController::class, 'markRead'])->name('notifications.read');
+
+    // Audit trail (administrator)
+    Route::get('logs', [AuditLogController::class, 'index'])->name('logs.index');
 
     // Users (administrator)
     Route::get('users', [UserController::class, 'index'])->name('users.index');

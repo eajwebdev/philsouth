@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
+use App\Models\Employee;
 use App\Models\Item;
 use App\Models\Site;
 use App\Models\WithdrawalSlip;
-use App\Services\NumberService;
+use App\Notifications\WorkflowNotification;
 use App\Services\StockService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -31,7 +35,7 @@ class WithdrawalSlipController extends Controller
                 $q->where(fn ($w) => $w->where('ws_no', 'like', "%{$s}%")->orWhere('delivered_to', 'like', "%{$s}%"));
             })
             ->latest()
-            ->paginate(15)
+            ->paginate(10)
             ->withQueryString();
 
         return Inertia::render('withdrawals/index', [
@@ -48,13 +52,22 @@ class WithdrawalSlipController extends Controller
     {
         $this->authorize('create', WithdrawalSlip::class);
 
+        $sites = $request->user()->accessibleSites();
+
         return Inertia::render('withdrawals/create', [
-            'sites' => $request->user()->accessibleSites()->map->only('id', 'code', 'name'),
+            'sites' => $sites->map->only('id', 'code', 'name'),
             'items' => $this->itemOptions(),
+            // Roster names per site, so "Delivered to" can be an actual person.
+            'employees' => Employee::query()
+                ->active()
+                ->whereIn('site_id', $sites->pluck('id'))
+                ->orderBy('name')
+                ->get(['id', 'site_id', 'name', 'position'])
+                ->groupBy('site_id'),
         ]);
     }
 
-    public function store(Request $request, NumberService $numbers): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', WithdrawalSlip::class);
 
@@ -62,9 +75,10 @@ class WithdrawalSlipController extends Controller
         $site = Site::findOrFail($data['site_id']);
         abort_unless($request->user()->canAccessSite($site), 403);
 
-        $ws = DB::transaction(function () use ($data, $request, $numbers) {
+        $ws = DB::transaction(function () use ($data, $request) {
             $ws = WithdrawalSlip::create([
-                'ws_no' => $numbers->next('ws'),
+                // Manual entry: the number comes from the pre-printed booklet slip.
+                'ws_no' => trim($data['ws_no']),
                 'project_code' => $data['project_code'] ?? null,
                 'site_id' => $data['site_id'],
                 'date' => $data['date'],
@@ -116,11 +130,44 @@ class WithdrawalSlipController extends Controller
         ]);
     }
 
+    /**
+     * Stream the withdrawal slip as a PDF laid out like the F-INV-001 paper form.
+     */
+    public function pdf(Request $request, WithdrawalSlip $withdrawal)
+    {
+        $this->authorize('view', $withdrawal);
+
+        $withdrawal->load([
+            'site:id,code,name',
+            'items.variant:id,item_id,sku,label,uom',
+            'items.variant.item:id,code,description,uom',
+            'preparedBy:id,name',
+            'approvedBy:id,name',
+            'releasedBy:id,name',
+        ]);
+
+        return Pdf::loadView('pdf.withdrawal-slip', ['slip' => $withdrawal])
+            ->setPaper('a4', 'portrait')
+            ->stream("withdrawal-{$withdrawal->ws_no}.pdf");
+    }
+
     public function submit(WithdrawalSlip $withdrawal): RedirectResponse
     {
         $this->authorize('submit', $withdrawal);
 
         $withdrawal->update(['status' => 'pending_approval']);
+        $withdrawal->loadMissing('site');
+
+        AuditLog::record('withdrawal.submitted', $withdrawal, "{$withdrawal->ws_no} submitted for approval");
+        Notification::send(
+            $withdrawal->site->engineers()->get(),
+            new WorkflowNotification(
+                'Withdrawal awaiting approval',
+                "{$withdrawal->ws_no} at {$withdrawal->site->name} needs your approval.",
+                route('withdrawals.show', $withdrawal->id),
+                'clipboard-list',
+            ),
+        );
 
         return back()->with('success', "{$withdrawal->ws_no} submitted for approval.");
     }
@@ -134,6 +181,14 @@ class WithdrawalSlipController extends Controller
             'approved_by' => $request->user()->id,
             'approved_at' => now(),
         ]);
+
+        AuditLog::record('withdrawal.approved', $withdrawal, "{$withdrawal->ws_no} approved");
+        $withdrawal->preparedBy?->notify(new WorkflowNotification(
+            'Withdrawal approved',
+            "{$withdrawal->ws_no} was approved — ready to release.",
+            route('withdrawals.show', $withdrawal->id),
+            'check',
+        ));
 
         return back()->with('success', "{$withdrawal->ws_no} approved.");
     }
@@ -149,6 +204,16 @@ class WithdrawalSlipController extends Controller
             'approved_by' => $request->user()->id,
             'reject_reason' => $data['reject_reason'] ?? null,
         ]);
+
+        AuditLog::record('withdrawal.rejected', $withdrawal, "{$withdrawal->ws_no} rejected", [
+            'reason' => $data['reject_reason'] ?? null,
+        ]);
+        $withdrawal->preparedBy?->notify(new WorkflowNotification(
+            'Withdrawal rejected',
+            "{$withdrawal->ws_no} was rejected".($data['reject_reason'] ? ": {$data['reject_reason']}" : '.'),
+            route('withdrawals.show', $withdrawal->id),
+            'x',
+        ));
 
         return back()->with('success', "{$withdrawal->ws_no} rejected.");
     }
@@ -192,6 +257,8 @@ class WithdrawalSlipController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
+        AuditLog::record('withdrawal.released', $withdrawal, "{$withdrawal->ws_no} released — stock issued");
+
         return back()->with('success', "{$withdrawal->ws_no} released — stock issued.");
     }
 
@@ -223,6 +290,7 @@ class WithdrawalSlipController extends Controller
     protected function validateSlip(Request $request): array
     {
         return $request->validate([
+            'ws_no' => ['required', 'string', 'max:50', Rule::unique('withdrawal_slips', 'ws_no')],
             'site_id' => ['required', 'integer', Rule::exists('sites', 'id')],
             'project_code' => ['nullable', 'string', 'max:100'],
             'date' => ['required', 'date'],

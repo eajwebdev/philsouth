@@ -30,6 +30,7 @@ class StockService
      *     movement_date?: string|\DateTimeInterface|null,
      *     remarks?: string|null,
      *     created_by?: int|null,
+     *     unit_cost?: float|null,
      * }  $meta
      */
     public function postMovement(
@@ -79,8 +80,25 @@ class StockService
             // 3. Compute the new balance.
             $balanceAfter = $direction === 'in' ? $current + $qty : $current - $qty;
 
-            // 4. Update the running balance.
+            // 3b. Moving-average cost. An IN with a known unit cost re-averages the
+            //     on-hand value; every other movement is valued at the current
+            //     average (which therefore stays put).
+            $currentAvg = (float) ($stock->avg_cost ?? 0);
+            $inCost = isset($meta['unit_cost']) && $meta['unit_cost'] !== null ? (float) $meta['unit_cost'] : null;
+
+            if ($direction === 'in' && $inCost !== null && $inCost >= 0) {
+                $newAvg = $current > 0
+                    ? (($current * $currentAvg) + ($qty * $inCost)) / ($current + $qty)
+                    : $inCost;
+                $movementCost = $inCost;
+            } else {
+                $newAvg = $currentAvg;
+                $movementCost = $currentAvg;
+            }
+
+            // 4. Update the running balance + average cost.
             $stock->balance = $balanceAfter;
+            $stock->avg_cost = round($newAvg, 4);
             $stock->save();
 
             // 5. Insert the ledger row.
@@ -96,6 +114,7 @@ class StockService
                 'dr_ws_no' => $meta['dr_ws_no'] ?? null,
                 'issued_to' => $meta['issued_to'] ?? null,
                 'quantity' => $qty,
+                'unit_cost' => round($movementCost, 4),
                 'balance_after' => $balanceAfter,
                 'movement_date' => $meta['movement_date'] ?? now()->toDateString(),
                 'remarks' => $meta['remarks'] ?? null,

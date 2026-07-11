@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { Head, router } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Boxes, Search, AlertTriangle } from 'lucide-react';
+import { Boxes, Search, AlertTriangle, SlidersHorizontal, Wallet } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { DataTable } from '@/components/data-table';
 import { Pagination } from '@/components/pagination';
+import { IconButton } from '@/components/icon-button';
+import { ThresholdDialog } from '@/components/threshold-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +27,7 @@ interface StockRow {
     min_qty: string;
     max_qty: string | null;
     balance: string;
+    avg_cost: string;
     variant: {
         id: number;
         sku: string;
@@ -37,11 +40,16 @@ interface StockRow {
 interface Props {
     stock: Paginated<StockRow>;
     sites: SiteRef[];
+    totalValue: number;
+    canManage: boolean;
     filters: { search: string | null; site_id: number | null; low_only: boolean };
 }
 
-export default function InventoryIndex({ stock, sites, filters }: Props) {
+const peso = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export default function InventoryIndex({ stock, sites, totalValue, canManage, filters }: Props) {
     const [search, setSearch] = React.useState(filters.search ?? '');
+    const [editing, setEditing] = React.useState<StockRow | null>(null);
 
     const reload = (params: Record<string, unknown>) => {
         router.get(
@@ -112,6 +120,34 @@ export default function InventoryIndex({ stock, sites, filters }: Props) {
                 </div>
             ),
         },
+        {
+            id: 'avg_cost',
+            header: () => <span className="block text-right">Unit cost</span>,
+            cell: ({ row }) => {
+                const c = parseFloat(row.original.avg_cost);
+                return <span className="block text-right tabular-nums text-muted-foreground">{c > 0 ? peso(c) : '—'}</span>;
+            },
+        },
+        {
+            id: 'value',
+            header: () => <span className="block text-right">Value</span>,
+            cell: ({ row }) => {
+                const v = parseFloat(row.original.balance) * parseFloat(row.original.avg_cost);
+                return <span className="block text-right font-medium tabular-nums">{v > 0 ? peso(v) : '—'}</span>;
+            },
+        },
+        ...(canManage ? [{
+            id: 'actions',
+            header: () => <span className="sr-only">Actions</span>,
+            enableSorting: false,
+            cell: ({ row }: { row: { original: StockRow } }) => (
+                <div className="flex justify-end">
+                    <IconButton label="Edit reorder levels" onClick={() => setEditing(row.original)}>
+                        <SlidersHorizontal />
+                    </IconButton>
+                </div>
+            ),
+        }] : []),
     ];
 
     return (
@@ -122,6 +158,15 @@ export default function InventoryIndex({ stock, sites, filters }: Props) {
                     title="Stock on hand"
                     description="Live balances per site and item, from the movement ledger."
                     icon={Boxes}
+                    actions={
+                        <div className="flex items-center gap-2 rounded-lg border bg-card px-4 py-2 shadow-sm">
+                            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Wallet className="size-4" /></span>
+                            <div>
+                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Total value</p>
+                                <p className="text-lg font-semibold tabular-nums leading-tight">{peso(totalValue)}</p>
+                            </div>
+                        </div>
+                    }
                 />
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -157,6 +202,17 @@ export default function InventoryIndex({ stock, sites, filters }: Props) {
                 <DataTable columns={columns} data={stock.data} emptyState="No stock records for this filter." />
                 <Pagination meta={stock} />
             </div>
+
+            <ThresholdDialog
+                target={editing ? {
+                    id: editing.id,
+                    item: editing.variant.item.description + (editing.variant.label ? ` — ${editing.variant.label}` : ''),
+                    min_qty: editing.min_qty,
+                    max_qty: editing.max_qty,
+                    location: editing.location,
+                } : null}
+                onClose={() => setEditing(null)}
+            />
         </>
     );
 }

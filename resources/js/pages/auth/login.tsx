@@ -164,7 +164,7 @@ export default function Login({ status }: { status?: string }) {
                         <div className="mb-8 flex flex-col items-center text-center">
                             <div className="animate-float">
                                 <img
-                                    src="/logo.jpg"
+                                    src="/logo.png"
                                     alt="PhilSouth Builders"
                                     className="size-20 rounded-2xl object-contain shadow-lg shadow-black/40 ring-2 ring-[#E5B65A]/40"
                                 />

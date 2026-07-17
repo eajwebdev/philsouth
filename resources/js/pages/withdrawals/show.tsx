@@ -1,11 +1,8 @@
 import * as React from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     ClipboardList,
-    Send,
-    Check,
-    X,
     PackageCheck,
     PackageOpen,
     Ban,
@@ -16,10 +13,10 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { LocationStamps, type LocationStampRow } from '@/components/location-stamps';
+import { LocationLock, EMPTY_GEO, type GeoPayload } from '@/components/location-lock';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -29,14 +26,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { cn, formatDate, formatQty } from '@/lib/utils';
 
 interface Line {
@@ -75,28 +64,27 @@ interface Slip {
 }
 interface Props {
     slip: Slip;
+    locationStamps: LocationStampRow[];
     can: {
-        submit: boolean;
-        approve: boolean;
-        reject: boolean;
         release: boolean;
         receive: boolean;
         cancel: boolean;
     };
 }
 
-const STEPS = ['draft', 'pending_approval', 'approved', 'released', 'received'];
+// No approval step — a draft releases directly.
+const STEPS = ['draft', 'released', 'received'];
 const STEP_LABEL: Record<string, string> = {
     draft: 'Draft',
-    pending_approval: 'Pending approval',
-    approved: 'Approved',
     released: 'Released',
     received: 'Received',
 };
 
 function WorkflowStepper({ status }: { status: string }) {
     const terminal = status === 'rejected' || status === 'cancelled';
-    const currentIndex = STEPS.indexOf(status);
+    // Legacy slips may still carry pre-approval statuses; treat them as draft.
+    const effective = status === 'pending_approval' || status === 'approved' ? 'draft' : status;
+    const currentIndex = STEPS.indexOf(effective);
 
     if (terminal) {
         return (
@@ -139,12 +127,13 @@ function WorkflowStepper({ status }: { status: string }) {
     );
 }
 
-export default function WithdrawalShow({ slip, can }: Props) {
-    const [rejectOpen, setRejectOpen] = React.useState(false);
-    const [confirm, setConfirm] = React.useState<null | 'submit' | 'release' | 'receive' | 'cancel'>(null);
+export default function WithdrawalShow({ slip, can, locationStamps }: Props) {
+    const [confirm, setConfirm] = React.useState<null | 'release' | 'receive' | 'cancel'>(null);
+    const [geo, setGeo] = React.useState<GeoPayload>(EMPTY_GEO);
 
-    const act = (action: string) =>
-        router.post(route(`withdrawals.${action}`, slip.id), {}, { preserveScroll: true, onFinish: () => setConfirm(null) });
+    // Releasing physically hands over stock — geotag it.
+    const act = (action: string, payload: Record<string, unknown> = {}) =>
+        router.post(route(`withdrawals.${action}`, slip.id), payload, { preserveScroll: true, onFinish: () => setConfirm(null) });
 
     const requestedBy = slip.requested_by_type === 'others'
         ? slip.requested_by_other ?? 'Others'
@@ -168,15 +157,6 @@ export default function WithdrawalShow({ slip, can }: Props) {
                                 <Button variant="outline" onClick={() => window.open(route('withdrawals.pdf', slip.id), '_blank')}><FileDown /> View PDF</Button>
                                 {can.cancel && (
                                     <Button variant="outline" onClick={() => setConfirm('cancel')}><Ban /> Cancel</Button>
-                                )}
-                                {can.submit && (
-                                    <Button onClick={() => setConfirm('submit')}><Send /> Submit for approval</Button>
-                                )}
-                                {can.reject && (
-                                    <Button variant="outline" onClick={() => setRejectOpen(true)}><X /> Reject</Button>
-                                )}
-                                {can.approve && (
-                                    <Button onClick={() => act('approve')}><Check /> Approve</Button>
                                 )}
                                 {can.release && (
                                     <Button onClick={() => setConfirm('release')}><PackageCheck /> Release stock</Button>
@@ -209,9 +189,8 @@ export default function WithdrawalShow({ slip, can }: Props) {
                         {slip.delivered_to && <p className="text-xs text-muted-foreground">To: {slip.delivered_to}</p>}
                     </div>
                     <div>
-                        <p className="text-xs text-muted-foreground">Prepared / approved</p>
+                        <p className="text-xs text-muted-foreground">Prepared by</p>
                         <p className="font-medium">{slip.prepared_by?.name ?? '—'}</p>
-                        {slip.approved_by && <p className="text-xs text-muted-foreground">Approved by {slip.approved_by.name}</p>}
                     </div>
                     <div>
                         <p className="text-xs text-muted-foreground">Released / received</p>
@@ -256,19 +235,10 @@ export default function WithdrawalShow({ slip, can }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                <LocationStamps stamps={locationStamps} />
             </div>
 
-            <RejectDialog open={rejectOpen} onOpenChange={setRejectOpen} slip={slip} />
-
-            <ConfirmDialog
-                open={confirm === 'submit'}
-                onOpenChange={(o) => !o && setConfirm(null)}
-                destructive={false}
-                title={`Submit ${slip.ws_no}?`}
-                description="This sends the slip to an engineer for approval."
-                confirmLabel="Submit"
-                onConfirm={() => act('submit')}
-            />
             <ConfirmDialog
                 open={confirm === 'release'}
                 onOpenChange={(o) => !o && setConfirm(null)}
@@ -276,8 +246,10 @@ export default function WithdrawalShow({ slip, can }: Props) {
                 title={`Release ${slip.ws_no}?`}
                 description="This issues the stock OUT and deducts it from the site balance. It can't be undone."
                 confirmLabel="Release stock"
-                onConfirm={() => act('release')}
-            />
+                onConfirm={() => act('release', { ...geo })}
+            >
+                <LocationLock active={confirm === 'release'} onChange={setGeo} />
+            </ConfirmDialog>
             <ConfirmDialog
                 open={confirm === 'receive'}
                 onOpenChange={(o) => !o && setConfirm(null)}
@@ -295,47 +267,6 @@ export default function WithdrawalShow({ slip, can }: Props) {
                 onConfirm={() => act('cancel')}
             />
         </>
-    );
-}
-
-function RejectDialog({
-    open,
-    onOpenChange,
-    slip,
-}: {
-    open: boolean;
-    onOpenChange: (o: boolean) => void;
-    slip: Slip;
-}) {
-    const { data, setData, post, processing, reset } = useForm({ reject_reason: '' });
-
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(route('withdrawals.reject', slip.id), {
-            preserveScroll: true,
-            onSuccess: () => { onOpenChange(false); reset(); },
-        });
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <form onSubmit={submit}>
-                    <DialogHeader>
-                        <DialogTitle>Reject {slip.ws_no}</DialogTitle>
-                        <DialogDescription>Optionally note why this slip is being rejected.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-2 py-4">
-                        <Label htmlFor="reject_reason">Reason</Label>
-                        <Input id="reject_reason" value={data.reject_reason} onChange={(e) => setData('reject_reason', e.target.value)} placeholder="Optional" />
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" variant="destructive" disabled={processing}>Reject slip</Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
     );
 }
 

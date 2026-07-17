@@ -5,6 +5,8 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { LocationStamps, type LocationStampRow } from '@/components/location-stamps';
+import { LocationLock, EMPTY_GEO, type GeoPayload } from '@/components/location-lock';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +46,7 @@ interface Receipt {
 }
 interface Props {
     receipt: Receipt;
+    locationStamps: LocationStampRow[];
     can: { post: boolean; cancel: boolean; update: boolean; delete: boolean };
 }
 
@@ -53,7 +56,8 @@ const SOURCE_LABEL: Record<Receipt['source'], string> = {
     other: 'Other source',
 };
 
-export default function ReceivingShow({ receipt, can }: Props) {
+export default function ReceivingShow({ receipt, can, locationStamps }: Props) {
+    const [geo, setGeo] = React.useState<GeoPayload>(EMPTY_GEO);
     const [confirmPost, setConfirmPost] = React.useState(false);
     const [confirmCancel, setConfirmCancel] = React.useState(false);
     const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -153,6 +157,8 @@ export default function ReceivingShow({ receipt, can }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                <LocationStamps stamps={locationStamps} />
             </div>
 
             <ConfirmDialog
@@ -162,8 +168,10 @@ export default function ReceivingShow({ receipt, can }: Props) {
                 title={`Post ${receipt.dr_no}?`}
                 description="This adds every line to the site's stock balance and can't be undone."
                 confirmLabel="Post & receive"
-                onConfirm={() => router.post(route('receiving.post', receipt.id), {}, { preserveScroll: true, onFinish: () => setConfirmPost(false) })}
-            />
+                onConfirm={() => router.post(route('receiving.post', receipt.id), { ...geo }, { preserveScroll: true, onFinish: () => setConfirmPost(false) })}
+            >
+                <LocationLock active={confirmPost} onChange={setGeo} />
+            </ConfirmDialog>
             <ConfirmDialog
                 open={confirmCancel}
                 onOpenChange={setConfirmCancel}

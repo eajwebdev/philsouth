@@ -68,7 +68,7 @@ export default function WithdrawalCreate({ sites, items, employees }: Props) {
                     </Button>
                     <PageHeader
                         title="New withdrawal slip"
-                        description="Create a draft. It won't move stock until approved and released."
+                        description="Create a draft. It won't move stock until released."
                         icon={ClipboardList}
                         actions={
                             <div className="flex items-center gap-2">

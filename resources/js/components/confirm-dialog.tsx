@@ -20,6 +20,8 @@ interface ConfirmDialogProps {
     confirmLabel?: string;
     cancelLabel?: string;
     destructive?: boolean;
+    /** Extra content rendered between the description and the buttons (e.g. LocationLock). */
+    children?: React.ReactNode;
     onConfirm: () => void;
 }
 
@@ -34,6 +36,7 @@ export function ConfirmDialog({
     confirmLabel = 'Confirm',
     cancelLabel = 'Cancel',
     destructive = true,
+    children,
     onConfirm,
 }: ConfirmDialogProps) {
     return (
@@ -45,6 +48,7 @@ export function ConfirmDialog({
                         <AlertDialogDescription>{description}</AlertDialogDescription>
                     )}
                 </AlertDialogHeader>
+                {children}
                 <AlertDialogFooter>
                     <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
                     <AlertDialogAction

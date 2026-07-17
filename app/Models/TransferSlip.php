@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class TransferSlip extends Model
 {
@@ -85,5 +86,11 @@ class TransferSlip extends Model
     public function isInTransit(): bool
     {
         return $this->status === 'in_transit';
+    }
+
+    /** Where the actor was when this record's actions happened. */
+    public function locationStamps(): MorphMany
+    {
+        return $this->morphMany(LocationStamp::class, 'stampable');
     }
 }

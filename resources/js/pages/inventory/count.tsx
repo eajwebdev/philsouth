@@ -6,6 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { ScanField } from '@/components/scan-field';
 import { VariantPicker } from '@/components/variant-picker';
+import { LocationLock, EMPTY_GEO, type GeoPayload } from '@/components/location-lock';
 import { IconButton } from '@/components/icon-button';
 import type { CatalogItem } from '@/components/line-items-editor';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ export default function PhysicalCount({ sites, items, canAdjust }: Props) {
     const [siteId, setSiteId] = React.useState<string>(sites[0]?.id ? String(sites[0].id) : '');
     const [rows, setRows] = React.useState<CountRow[]>([]);
     const [manual, setManual] = React.useState<number | null>(null);
+    const [geo, setGeo] = React.useState<GeoPayload>(EMPTY_GEO);
 
     const addVariant = async (variantId: number, barcode?: string) => {
         if (!siteId) {
@@ -102,7 +104,8 @@ export default function PhysicalCount({ sites, items, canAdjust }: Props) {
         setRows((prev) => prev.map((r) => (r.variantId === variantId ? { ...r, posting: true } : r)));
         router.post(
             route('inventory.count.store'),
-            { site_id: siteId, item_variant_id: variantId, counted_qty: row.counted },
+            // Geotag where the count was actually taken (never blocks the post).
+            { site_id: siteId, item_variant_id: variantId, counted_qty: row.counted, ...geo },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -153,6 +156,7 @@ export default function PhysicalCount({ sites, items, canAdjust }: Props) {
                             </div>
                         </div>
                         <ScanField onScan={onScan} placeholder="Scan an item barcode to add it to the count…" autoFocus />
+                        <LocationLock onChange={setGeo} />
                     </CardContent>
                 </Card>
 

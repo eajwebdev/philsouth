@@ -6,6 +6,7 @@ use App\Models\Concerns\ScopedBySite;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class WithdrawalSlip extends Model
 {
@@ -86,5 +87,11 @@ class WithdrawalSlip extends Model
     public function isReleased(): bool
     {
         return $this->status === 'released';
+    }
+
+    /** Where the actor was when this record's actions happened. */
+    public function locationStamps(): MorphMany
+    {
+        return $this->morphMany(LocationStamp::class, 'stampable');
     }
 }

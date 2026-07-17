@@ -5,6 +5,8 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { LocationStamps, type LocationStampRow } from '@/components/location-stamps';
+import { LocationLock, EMPTY_GEO, type GeoPayload } from '@/components/location-lock';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -60,15 +62,17 @@ interface Transfer {
 }
 interface Props {
     transfer: Transfer;
+    locationStamps: LocationStampRow[];
     can: { dispatch: boolean; receive: boolean; cancel: boolean };
 }
 
-export default function TransferShow({ transfer, can }: Props) {
+export default function TransferShow({ transfer, can, locationStamps }: Props) {
     const [receiveOpen, setReceiveOpen] = React.useState(false);
     const [confirm, setConfirm] = React.useState<null | 'dispatch' | 'cancel'>(null);
+    const [geo, setGeo] = React.useState<GeoPayload>(EMPTY_GEO);
 
-    const act = (action: string) =>
-        router.post(route(`transfers.${action}`, transfer.id), {}, { preserveScroll: true, onFinish: () => setConfirm(null) });
+    const act = (action: string, payload: Record<string, unknown> = {}) =>
+        router.post(route(`transfers.${action}`, transfer.id), payload, { preserveScroll: true, onFinish: () => setConfirm(null) });
 
     return (
         <>
@@ -166,8 +170,10 @@ export default function TransferShow({ transfer, can }: Props) {
                 title={`Dispatch ${transfer.ts_no}?`}
                 description={`This deducts the items from ${transfer.from_site.name} and marks them in transit.`}
                 confirmLabel="Dispatch"
-                onConfirm={() => act('dispatch')}
-            />
+                onConfirm={() => act('dispatch', { ...geo })}
+            >
+                <LocationLock active={confirm === 'dispatch'} onChange={setGeo} />
+            </ConfirmDialog>
             <ConfirmDialog
                 open={confirm === 'cancel'}
                 onOpenChange={(o) => !o && setConfirm(null)}
@@ -189,7 +195,11 @@ function ReceiveDialog({
     onOpenChange: (o: boolean) => void;
     transfer: Transfer;
 }) {
-    const { data, setData, post, processing, reset } = useForm({ received_by: '', time_received: '' });
+    const [geo, setGeo] = React.useState<GeoPayload>(EMPTY_GEO);
+    const { data, setData, post, processing, reset, transform } = useForm({ received_by: '', time_received: '' });
+
+    // Geotag where the stock was actually received.
+    transform((d) => ({ ...d, ...geo }));
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -218,7 +228,12 @@ function ReceiveDialog({
                             <Label htmlFor="time_received">Time received</Label>
                             <Input id="time_received" type="time" value={data.time_received} onChange={(e) => setData('time_received', e.target.value)} />
                         </div>
-                    </div>
+                        <div className="sm:col-span-2">
+                            <LocationLock active={open} onChange={setGeo} />
+                        </div>
+        
+                <LocationStamps stamps={locationStamps} />
+            </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button type="submit" disabled={processing}>Confirm receipt</Button>

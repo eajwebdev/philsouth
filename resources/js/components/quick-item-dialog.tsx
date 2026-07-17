@@ -14,6 +14,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { UOM_OPTIONS } from '@/lib/uom';
 import type { CatalogItem } from '@/components/line-items-editor';
 
 /**
@@ -80,7 +81,10 @@ export function QuickItemDialog({ onCreated }: { onCreated: (item: CatalogItem) 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="qi-uom">Unit (U.O.M.)</Label>
-                            <Input id="qi-uom" value={form.uom} onChange={set('uom')} placeholder="pcs, m, kg…" />
+                            <Input id="qi-uom" list="qi-uom-options" value={form.uom} onChange={set('uom')} placeholder="pcs, m, kg…" />
+                            <datalist id="qi-uom-options">
+                                {UOM_OPTIONS.map((u) => <option key={u} value={u} />)}
+                            </datalist>
                             {errors.uom && <p className="text-sm text-destructive">{errors.uom}</p>}
                         </div>
                         <div className="grid gap-2">

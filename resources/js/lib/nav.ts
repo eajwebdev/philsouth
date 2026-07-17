@@ -6,6 +6,7 @@ import {
     Boxes,
     ClipboardCheck,
     PackageMinus,
+    MapPin,
     Truck,
     ClipboardList,
     ArrowLeftRight,
@@ -76,6 +77,12 @@ export const NAV_SECTIONS: NavSection[] = [
     {
         heading: 'Operations',
         items: [
+            {
+                label: 'Site Check-in',
+                routeName: 'check-in.index',
+                icon: MapPin,
+                activeMatch: ['check-in.'],
+            },
             {
                 label: 'Receiving',
                 routeName: 'receiving.index',

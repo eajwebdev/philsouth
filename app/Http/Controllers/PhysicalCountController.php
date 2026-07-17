@@ -37,6 +37,7 @@ class PhysicalCountController extends Controller
             'site_id' => ['required', 'integer', Rule::exists('sites', 'id')],
             'item_variant_id' => ['required', 'integer', Rule::exists('item_variants', 'id')],
             'counted_qty' => ['required', 'numeric', 'min:0'],
+            ...\App\Models\LocationStamp::rules(),
         ]);
 
         $site = Site::findOrFail($data['site_id']);
@@ -69,6 +70,7 @@ class PhysicalCountController extends Controller
             'counted' => (float) $data['counted_qty'],
             'variance' => $variance,
         ], $site->id);
+        \App\Models\LocationStamp::capture($request, $site, 'counted');
 
         $sign = $variance > 0 ? '+' : '';
         return back()->with('success', "Adjustment posted for {$variant->sku}: {$sign}{$variance}.");

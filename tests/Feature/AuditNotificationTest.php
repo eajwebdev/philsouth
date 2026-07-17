@@ -48,31 +48,20 @@ class AuditNotificationTest extends TestCase
         return $ws;
     }
 
-    public function test_submit_audits_and_notifies_the_site_engineer(): void
+    public function test_release_audits_and_notifies_the_site_engineer(): void
     {
         $ws = $this->draft();
 
-        $this->actingAs($this->ics)->post(route('withdrawals.submit', $ws))->assertRedirect();
+        $this->actingAs($this->ics)->post(route('withdrawals.release', $ws))->assertRedirect();
 
-        $this->assertDatabaseHas('audit_logs', ['action' => 'withdrawal.submitted', 'user_id' => $this->ics->id]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'withdrawal.released', 'user_id' => $this->ics->id]);
         $this->assertSame(1, $this->engineer->fresh()->unreadNotifications()->count());
-    }
-
-    public function test_approval_audits_and_notifies_the_preparer(): void
-    {
-        $ws = $this->draft();
-        $ws->update(['status' => 'pending_approval']);
-
-        $this->actingAs($this->engineer)->post(route('withdrawals.approve', $ws))->assertRedirect();
-
-        $this->assertDatabaseHas('audit_logs', ['action' => 'withdrawal.approved', 'user_id' => $this->engineer->id]);
-        $this->assertSame(1, $this->ics->fresh()->unreadNotifications()->count());
     }
 
     public function test_notifications_can_be_marked_read(): void
     {
         $ws = $this->draft();
-        $this->actingAs($this->ics)->post(route('withdrawals.submit', $ws));
+        $this->actingAs($this->ics)->post(route('withdrawals.release', $ws));
 
         $this->assertSame(1, $this->engineer->fresh()->unreadNotifications()->count());
 
@@ -85,7 +74,7 @@ class AuditNotificationTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('administrator');
-        AuditLog::record('withdrawal.approved', $this->draft(), 'demo');
+        AuditLog::record('withdrawal.released', $this->draft(), 'demo');
 
         $this->actingAs($admin)->get(route('logs.index'))
             ->assertOk()

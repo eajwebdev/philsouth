@@ -21,6 +21,10 @@ class UserController extends Controller
 
         $users = User::query()
             ->with('roles:id,name', 'sites:id,code,name')
+            // Superadmin accounts are invisible to everyone below superadmin.
+            ->when(! $request->user()->hasRole('superadmin'), function ($q) {
+                $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin'));
+            })
             ->when($request->string('search')->isNotEmpty(), function ($q) use ($request) {
                 $s = $request->string('search')->value();
                 $q->where(fn ($w) => $w->where('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%"));
@@ -60,6 +64,7 @@ class UserController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         $this->ensureCanManage($request);
+        $this->ensureCanTouch($request, $user);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -71,7 +76,7 @@ class UserController extends Controller
         $user->update([
             'name' => $data['name'],
             'email' => $data['email'],
-            ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
+            ...(($data['password'] ?? null) ? ['password' => Hash::make($data['password'])] : []),
         ]);
         $user->syncRoles([$data['role']]);
 
@@ -81,6 +86,7 @@ class UserController extends Controller
     public function destroy(Request $request, User $user): RedirectResponse
     {
         $this->ensureCanManage($request);
+        $this->ensureCanTouch($request, $user);
 
         if ($user->id === $request->user()->id) {
             return back()->with('error', 'You cannot delete your own account.');
@@ -94,6 +100,12 @@ class UserController extends Controller
     protected function ensureCanManage(Request $request): void
     {
         abort_unless($request->user()->can('users.manage'), 403);
+    }
+
+    /** Only a superadmin may edit or delete a superadmin account. */
+    protected function ensureCanTouch(Request $request, User $user): void
+    {
+        abort_if($user->hasRole('superadmin') && ! $request->user()->hasRole('superadmin'), 403);
     }
 
     /**

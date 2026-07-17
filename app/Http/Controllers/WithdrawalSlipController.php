@@ -119,10 +119,8 @@ class WithdrawalSlipController extends Controller
 
         return Inertia::render('withdrawals/show', [
             'slip' => $withdrawal,
+            'locationStamps' => \App\Models\LocationStamp::forRecord($withdrawal),
             'can' => [
-                'submit' => $user->can('submit', $withdrawal),
-                'approve' => $user->can('approve', $withdrawal),
-                'reject' => $user->can('reject', $withdrawal),
                 'release' => $user->can('release', $withdrawal),
                 'receive' => $user->can('receive', $withdrawal),
                 'cancel' => $user->can('cancel', $withdrawal),
@@ -151,76 +149,9 @@ class WithdrawalSlipController extends Controller
             ->stream("withdrawal-{$withdrawal->ws_no}.pdf");
     }
 
-    public function submit(WithdrawalSlip $withdrawal): RedirectResponse
-    {
-        $this->authorize('submit', $withdrawal);
-
-        $withdrawal->update(['status' => 'pending_approval']);
-        $withdrawal->loadMissing('site');
-
-        AuditLog::record('withdrawal.submitted', $withdrawal, "{$withdrawal->ws_no} submitted for approval");
-        Notification::send(
-            $withdrawal->site->engineers()->get(),
-            new WorkflowNotification(
-                'Withdrawal awaiting approval',
-                "{$withdrawal->ws_no} at {$withdrawal->site->name} needs your approval.",
-                route('withdrawals.show', $withdrawal->id),
-                'clipboard-list',
-            ),
-        );
-
-        return back()->with('success', "{$withdrawal->ws_no} submitted for approval.");
-    }
-
-    public function approve(WithdrawalSlip $withdrawal, Request $request): RedirectResponse
-    {
-        $this->authorize('approve', $withdrawal);
-
-        $withdrawal->update([
-            'status' => 'approved',
-            'approved_by' => $request->user()->id,
-            'approved_at' => now(),
-        ]);
-
-        AuditLog::record('withdrawal.approved', $withdrawal, "{$withdrawal->ws_no} approved");
-        $withdrawal->preparedBy?->notify(new WorkflowNotification(
-            'Withdrawal approved',
-            "{$withdrawal->ws_no} was approved — ready to release.",
-            route('withdrawals.show', $withdrawal->id),
-            'check',
-        ));
-
-        return back()->with('success', "{$withdrawal->ws_no} approved.");
-    }
-
-    public function reject(WithdrawalSlip $withdrawal, Request $request): RedirectResponse
-    {
-        $this->authorize('reject', $withdrawal);
-
-        $data = $request->validate(['reject_reason' => ['nullable', 'string', 'max:500']]);
-
-        $withdrawal->update([
-            'status' => 'rejected',
-            'approved_by' => $request->user()->id,
-            'reject_reason' => $data['reject_reason'] ?? null,
-        ]);
-
-        AuditLog::record('withdrawal.rejected', $withdrawal, "{$withdrawal->ws_no} rejected", [
-            'reason' => $data['reject_reason'] ?? null,
-        ]);
-        $withdrawal->preparedBy?->notify(new WorkflowNotification(
-            'Withdrawal rejected',
-            "{$withdrawal->ws_no} was rejected".($data['reject_reason'] ? ": {$data['reject_reason']}" : '.'),
-            route('withdrawals.show', $withdrawal->id),
-            'x',
-        ));
-
-        return back()->with('success', "{$withdrawal->ws_no} rejected.");
-    }
-
     /**
-     * Release the slip: posts OUT usage movements. NO RELEASE WITHOUT APPROVAL
-     * is enforced by the policy (only an approved slip may be released).
+     * Release the slip: posts OUT usage movements. No approval step — a draft
+     * releases directly to the person or branch it's delivered to.
      */
     public function release(WithdrawalSlip $withdrawal, Request $request, StockService $stock): RedirectResponse
     {
@@ -258,6 +189,16 @@ class WithdrawalSlipController extends Controller
         }
 
         AuditLog::record('withdrawal.released', $withdrawal, "{$withdrawal->ws_no} released — stock issued");
+        \App\Models\LocationStamp::capture($request, $withdrawal, 'released');
+        Notification::send(
+            $withdrawal->site->engineers()->get(),
+            new WorkflowNotification(
+                'Withdrawal released',
+                "{$withdrawal->ws_no} at {$withdrawal->site->name} was released".($withdrawal->delivered_to ? " to {$withdrawal->delivered_to}." : '.'),
+                route('withdrawals.show', $withdrawal->id),
+                'clipboard-list',
+            ),
+        );
 
         return back()->with('success', "{$withdrawal->ws_no} released — stock issued.");
     }

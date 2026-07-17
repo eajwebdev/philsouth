@@ -38,34 +38,13 @@ class WithdrawalSlipPolicy
         return $this->update($user, $ws);
     }
 
-    /** ICS submits a draft for approval. */
-    public function submit(User $user, WithdrawalSlip $ws): bool
-    {
-        return $ws->isDraft()
-            && $user->hasPermissionTo('withdrawal.create')
-            && $user->canAccessSite($ws->site);
-    }
-
     /**
-     * Approve / reject: an engineer assigned to the slip's site.
-     * (superadmin bypasses via Gate::before.)
+     * No approval step: a draft may be released directly. Legacy slips still
+     * sitting in pending_approval/approved can also be released.
      */
-    public function approve(User $user, WithdrawalSlip $ws): bool
-    {
-        return $ws->isPending()
-            && $user->hasPermissionTo('withdrawal.approve')
-            && $user->canAccessSite($ws->site);
-    }
-
-    public function reject(User $user, WithdrawalSlip $ws): bool
-    {
-        return $this->approve($user, $ws);
-    }
-
-    /** NO RELEASE WITHOUT APPROVAL — only an approved slip may be released. */
     public function release(User $user, WithdrawalSlip $ws): bool
     {
-        return $ws->isApproved()
+        return in_array($ws->status, ['draft', 'pending_approval', 'approved'], true)
             && $user->hasPermissionTo('withdrawal.release')
             && $user->canAccessSite($ws->site);
     }

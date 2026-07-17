@@ -69,7 +69,7 @@ class WithdrawalTest extends TestCase
         return $ws;
     }
 
-    public function test_ics_creates_a_draft_then_submits_it(): void
+    public function test_ics_creates_a_draft(): void
     {
         $this->actingAs($this->ics)
             ->post(route('withdrawals.store'), [
@@ -83,9 +83,6 @@ class WithdrawalTest extends TestCase
 
         $ws = WithdrawalSlip::firstOrFail();
         $this->assertEquals('draft', $ws->status);
-
-        $this->actingAs($this->ics)->post(route('withdrawals.submit', $ws))->assertRedirect();
-        $this->assertEquals('pending_approval', $ws->fresh()->status);
     }
 
     public function test_duplicate_booklet_number_is_rejected(): void
@@ -103,40 +100,9 @@ class WithdrawalTest extends TestCase
         $this->assertSame(1, WithdrawalSlip::count());
     }
 
-    public function test_engineer_on_the_site_can_approve(): void
+    public function test_releasing_a_draft_posts_out_and_drops_balance(): void
     {
-        $ws = $this->draftSlip('pending_approval');
-
-        $this->actingAs($this->engineer)->post(route('withdrawals.approve', $ws))->assertRedirect();
-
-        $this->assertEquals('approved', $ws->fresh()->status);
-        $this->assertEquals($this->engineer->id, $ws->fresh()->approved_by);
-    }
-
-    public function test_engineer_from_another_site_cannot_approve(): void
-    {
-        $ws = $this->draftSlip('pending_approval');
-
-        $this->actingAs($this->foreignEngineer)->post(route('withdrawals.approve', $ws))->assertForbidden();
-        $this->assertEquals('pending_approval', $ws->fresh()->status);
-    }
-
-    public function test_no_release_without_approval(): void
-    {
-        // A pending (not approved) slip may not be released.
-        $pending = $this->draftSlip('pending_approval');
-        $this->actingAs($this->ics)->post(route('withdrawals.release', $pending))->assertForbidden();
-
-        // A draft may not be released either.
-        $draft = $this->draftSlip('draft');
-        $this->actingAs($this->ics)->post(route('withdrawals.release', $draft))->assertForbidden();
-
-        $this->assertEquals(0, \App\Models\StockMovement::where('direction', 'out')->count());
-    }
-
-    public function test_releasing_an_approved_slip_posts_out_and_drops_balance(): void
-    {
-        $ws = $this->draftSlip('approved');
+        $ws = $this->draftSlip();
 
         $before = app(StockService::class)->balance($this->site, $this->variant);
 
@@ -156,9 +122,38 @@ class WithdrawalTest extends TestCase
         ]);
     }
 
+    public function test_legacy_pending_or_approved_slips_can_still_be_released(): void
+    {
+        $pending = $this->draftSlip('pending_approval');
+        $this->actingAs($this->ics)->post(route('withdrawals.release', $pending))->assertRedirect();
+        $this->assertEquals('released', $pending->fresh()->status);
+
+        $approved = $this->draftSlip('approved');
+        $this->actingAs($this->ics)->post(route('withdrawals.release', $approved))->assertRedirect();
+        $this->assertEquals('released', $approved->fresh()->status);
+    }
+
+    public function test_user_from_another_site_cannot_release(): void
+    {
+        $ws = $this->draftSlip();
+
+        $this->actingAs($this->foreignEngineer)->post(route('withdrawals.release', $ws))->assertForbidden();
+        $this->assertEquals('draft', $ws->fresh()->status);
+        $this->assertEquals(0, \App\Models\StockMovement::where('direction', 'out')->count());
+    }
+
+    public function test_released_slip_cannot_be_released_again(): void
+    {
+        $ws = $this->draftSlip();
+        $this->actingAs($this->ics)->post(route('withdrawals.release', $ws));
+
+        $this->actingAs($this->ics)->post(route('withdrawals.release', $ws->fresh()))->assertForbidden();
+        $this->assertSame(1, \App\Models\StockMovement::where('direction', 'out')->count());
+    }
+
     public function test_released_slip_can_be_received(): void
     {
-        $ws = $this->draftSlip('approved');
+        $ws = $this->draftSlip();
         $this->actingAs($this->ics)->post(route('withdrawals.release', $ws));
 
         $this->actingAs($this->ics)->post(route('withdrawals.receive', $ws))->assertRedirect();
@@ -167,27 +162,15 @@ class WithdrawalTest extends TestCase
 
     public function test_show_page_renders_with_workflow_state(): void
     {
-        $ws = $this->draftSlip('pending_approval');
+        $ws = $this->draftSlip();
 
-        $this->actingAs($this->engineer)
+        $this->actingAs($this->ics)
             ->get(route('withdrawals.show', $ws))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('withdrawals/show')
-                ->where('slip.status', 'pending_approval')
-                ->where('can.approve', true)
-                ->where('can.release', false));
-    }
-
-    public function test_pending_slip_can_be_rejected_by_engineer(): void
-    {
-        $ws = $this->draftSlip('pending_approval');
-
-        $this->actingAs($this->engineer)
-            ->post(route('withdrawals.reject', $ws), ['reject_reason' => 'Over budget'])
-            ->assertRedirect();
-
-        $this->assertEquals('rejected', $ws->fresh()->status);
-        $this->assertEquals('Over budget', $ws->fresh()->reject_reason);
+                ->where('slip.status', 'draft')
+                ->where('can.release', true)
+                ->where('can.receive', false));
     }
 }

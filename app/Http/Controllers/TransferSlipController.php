@@ -107,6 +107,7 @@ class TransferSlipController extends Controller
 
         return Inertia::render('transfers/show', [
             'transfer' => $transfer,
+            'locationStamps' => \App\Models\LocationStamp::forRecord($transfer),
             'can' => [
                 'dispatch' => $user->can('dispatch', $transfer),
                 'receive' => $user->can('receive', $transfer),
@@ -170,6 +171,7 @@ class TransferSlipController extends Controller
         }
 
         AuditLog::record('transfer.dispatched', $transfer, "{$transfer->ts_no} dispatched to {$transfer->toSite->name}");
+        \App\Models\LocationStamp::capture($request, $transfer, 'dispatched');
         Notification::send(
             $transfer->toSite->icsUsers()->get(),
             new WorkflowNotification(
@@ -231,6 +233,7 @@ class TransferSlipController extends Controller
         });
 
         AuditLog::record('transfer.received', $transfer, "{$transfer->ts_no} received at {$transfer->toSite->name}");
+        \App\Models\LocationStamp::capture($request, $transfer, 'received');
 
         return back()->with('success', "{$transfer->ts_no} received — stock added at destination.");
     }

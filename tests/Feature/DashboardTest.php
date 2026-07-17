@@ -21,7 +21,7 @@ class DashboardTest extends TestCase
 
     public function test_administrator_sees_the_company_wide_dashboard(): void
     {
-        $admin = User::where('email', 'admin@philsouth.test')->firstOrFail();
+        $admin = User::where('email', 'admin@philsouth')->firstOrFail();
 
         $this->actingAs($admin)
             ->get(route('dashboard'))
@@ -38,7 +38,7 @@ class DashboardTest extends TestCase
 
     public function test_engineer_sees_the_approval_focused_dashboard(): void
     {
-        $engineer = User::where('email', 'engineer@philsouth.test')->firstOrFail();
+        $engineer = User::where('email', 'engineer@philsouth')->firstOrFail();
 
         $this->actingAs($engineer)
             ->get(route('dashboard'))
@@ -52,7 +52,7 @@ class DashboardTest extends TestCase
 
     public function test_ics_sees_the_operational_dashboard(): void
     {
-        $ics = User::where('email', 'ics@philsouth.test')->firstOrFail();
+        $ics = User::where('email', 'ics@philsouth')->firstOrFail();
 
         $this->actingAs($ics)
             ->get(route('dashboard'))

@@ -184,6 +184,7 @@ class DeliveryReceiptController extends Controller
 
         return Inertia::render('receiving/show', [
             'receipt' => $receiving,
+            'locationStamps' => \App\Models\LocationStamp::forRecord($receiving),
             'can' => [
                 'post' => $request->user()->can('post', $receiving),
                 'cancel' => $request->user()->can('cancel', $receiving),
@@ -250,6 +251,7 @@ class DeliveryReceiptController extends Controller
             'source' => $receiving->sourceLabel(),
             'items' => $receiving->items->count(),
         ]);
+        \App\Models\LocationStamp::capture($request, $receiving, 'posted');
 
         return back()->with('success', "{$receiving->dr_no} posted — stock received.");
     }

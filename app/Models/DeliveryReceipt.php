@@ -6,6 +6,7 @@ use App\Models\Concerns\ScopedBySite;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class DeliveryReceipt extends Model
 {
@@ -69,5 +70,11 @@ class DeliveryReceipt extends Model
             'other' => $this->supplier ?: 'Other source',
             default => ucfirst(str_replace('_', ' ', $this->source)),
         };
+    }
+
+    /** Where the actor was when this record's actions happened. */
+    public function locationStamps(): MorphMany
+    {
+        return $this->morphMany(LocationStamp::class, 'stampable');
     }
 }

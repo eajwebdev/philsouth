@@ -21,6 +21,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { UOM_OPTIONS } from '@/lib/uom';
 import type { Paginated } from '@/types';
 
 interface ItemRow {
@@ -271,7 +272,10 @@ function ItemFormDialog({
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="uom">UoM</Label>
-                                <Input id="uom" value={data.uom} onChange={(e) => setData('uom', e.target.value)} placeholder="bag" aria-invalid={!!errors.uom} />
+                                <Input id="uom" list="uom-options" value={data.uom} onChange={(e) => setData('uom', e.target.value)} placeholder="bag" aria-invalid={!!errors.uom} />
+                                <datalist id="uom-options">
+                                    {UOM_OPTIONS.map((u) => <option key={u} value={u} />)}
+                                </datalist>
                                 {errors.uom && <p className="text-sm text-destructive">{errors.uom}</p>}
                             </div>
                         </div>

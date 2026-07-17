@@ -37,7 +37,7 @@ interface Props {
     can: { create: boolean };
 }
 
-const STATUSES = ['draft', 'pending_approval', 'approved', 'released', 'received', 'rejected', 'cancelled'];
+const STATUSES = ['draft', 'released', 'received', 'cancelled'];
 
 export default function WithdrawalsIndex({ slips, filters, can }: Props) {
     const [search, setSearch] = React.useState(filters.search ?? '');
@@ -88,7 +88,7 @@ export default function WithdrawalsIndex({ slips, filters, can }: Props) {
             <div className="flex flex-col gap-6">
                 <PageHeader
                     title="Withdrawal slips"
-                    description="Material issuance — no release without engineer approval."
+                    description="Material issuance — release stock directly from a draft slip."
                     icon={ClipboardList}
                     actions={
                         can.create && (

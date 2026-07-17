@@ -22,8 +22,9 @@ class PagesRenderTest extends TestCase
 
     public function test_core_pages_render_for_superadmin(): void
     {
-        $super = User::where('email', 'super@philsouth.test')->firstOrFail();
-        $item = Item::where('code', 'PS-ST-REBAR')->firstOrFail();
+        $super = User::where('email', 'super@philsouth')->firstOrFail();
+        // The seeder no longer ships a catalogue — users add their own items.
+        $item = Item::create(['code' => 'CEM-001', 'description' => 'Portland Cement', 'uom' => 'bag']);
 
         $pages = [
             ['dashboard', 'dashboard'],
@@ -56,7 +57,7 @@ class PagesRenderTest extends TestCase
 
     public function test_ics_can_open_receiving_create(): void
     {
-        $ics = User::where('email', 'ics@philsouth.test')->firstOrFail();
+        $ics = User::where('email', 'ics@philsouth')->firstOrFail();
 
         $this->actingAs($ics)->get(route('receiving.create'))
             ->assertOk()->assertInertia(fn ($p) => $p->component('receiving/create'));

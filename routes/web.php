@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DeliveryReceiptController;
@@ -80,6 +81,10 @@ Route::middleware('auth')->group(function () {
     Route::get('inventory/reorder', [InventoryController::class, 'reorder'])->name('inventory.reorder');
     Route::put('inventory/{stock}/thresholds', [InventoryController::class, 'updateThresholds'])->name('inventory.thresholds');
 
+    // Site check-in (GPS arrival log)
+    Route::get('check-in', [CheckInController::class, 'index'])->name('check-in.index');
+    Route::post('check-in', [CheckInController::class, 'store'])->name('check-in.store');
+
     // Scanning + physical count
     Route::get('scan/lookup', [ScanController::class, 'lookup'])->name('scan.lookup');
     Route::get('inventory/count', [PhysicalCountController::class, 'index'])->name('inventory.count');
@@ -97,15 +102,12 @@ Route::middleware('auth')->group(function () {
     Route::post('receiving/{receiving}/post', [DeliveryReceiptController::class, 'post'])->name('receiving.post');
     Route::post('receiving/{receiving}/cancel', [DeliveryReceiptController::class, 'cancel'])->name('receiving.cancel');
 
-    // Withdrawal slips (F-INV-001) — NO RELEASE WITHOUT APPROVAL
+    // Withdrawal slips (F-INV-001) — drafts release directly, no approval step
     Route::get('withdrawals', [WithdrawalSlipController::class, 'index'])->name('withdrawals.index');
     Route::get('withdrawals/create', [WithdrawalSlipController::class, 'create'])->name('withdrawals.create');
     Route::post('withdrawals', [WithdrawalSlipController::class, 'store'])->name('withdrawals.store');
     Route::get('withdrawals/{withdrawal}/pdf', [WithdrawalSlipController::class, 'pdf'])->name('withdrawals.pdf');
     Route::get('withdrawals/{withdrawal}', [WithdrawalSlipController::class, 'show'])->name('withdrawals.show');
-    Route::post('withdrawals/{withdrawal}/submit', [WithdrawalSlipController::class, 'submit'])->name('withdrawals.submit');
-    Route::post('withdrawals/{withdrawal}/approve', [WithdrawalSlipController::class, 'approve'])->name('withdrawals.approve');
-    Route::post('withdrawals/{withdrawal}/reject', [WithdrawalSlipController::class, 'reject'])->name('withdrawals.reject');
     Route::post('withdrawals/{withdrawal}/release', [WithdrawalSlipController::class, 'release'])->name('withdrawals.release');
     Route::post('withdrawals/{withdrawal}/receive', [WithdrawalSlipController::class, 'receive'])->name('withdrawals.receive');
     Route::post('withdrawals/{withdrawal}/cancel', [WithdrawalSlipController::class, 'cancel'])->name('withdrawals.cancel');
